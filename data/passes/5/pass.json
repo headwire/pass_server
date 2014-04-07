@@ -2,10 +2,10 @@
   "passTypeIdentifier": "pass.co.iveew",
   "formatVersion": 1,
   "organizationName": "iVeew",
-  "serialNumber": "fcd55723d3b4e500327e44b80ca97597",
+  "serialNumber": "1a5fb98e4d0f3e198ee02d34bb898b80",
   "teamIdentifier": "TH6A6P",
-  "webServiceURL": "http://headwire.local:4567/",
-  "authenticationToken": "3a267840de3cc54dcdb64f90073c4d05",
+  "webServiceURL": "http://http://107.170.50.205/:80/",
+  "authenticationToken": "daba365c3c24ef2cf0f07857f94dabdf",
   "description": "iVeew Pass",
   "foregroundColor": "#FFFFFF",
   "backgroundColor": "#631313",
@@ -24,14 +24,14 @@
   "barcode": {
     "messageEncoding": "utf-8",
     "format": "PKBarcodeFormatQR",
-    "message": "{\"pass_type_id\":\"pass.com.codekollektiv.balance\",\"serial_number\":\"fcd55723d3b4e500327e44b80ca97597\",\"authentication_token\":\"3a267840de3cc54dcdb64f90073c4d05\"}"
+    "message": "{\"pass_type_id\":\"pass.com.codekollektiv.balance\",\"serial_number\":\"1a5fb98e4d0f3e198ee02d34bb898b80\",\"authentication_token\":\"daba365c3c24ef2cf0f07857f94dabdf\"}"
   },
   "storeCard": {
     "primaryFields": [
       {
         "key": "balance",
         "label": "Balance",
-        "value": 100.0,
+        "value": 1.0,
         "currencyCode": "EUR",
         "changeMessage": "Balance updated to %@."
       }
@@ -40,7 +40,7 @@
       {
         "key": "fullName",
         "label": "Name",
-        "value": "Y"
+        "value": "a"
       }
     ]
   }

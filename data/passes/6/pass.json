@@ -1,0 +1,100 @@
+{
+  "passTypeIdentifier": "pass.co.iveew",
+  "formatVersion": 1,
+  "organizationName": "iVeew",
+  "serialNumber": "41690e30ed345c3c692f0caf655201af",
+  "teamIdentifier": "TH6A6P",
+  "webServiceURL": "http://http://107.170.50.205/:80/",
+  "authenticationToken": "bd360c267057ccea7d474c26ab1b1096",
+  "description": "iVeew Pass",
+  "foregroundColor": "rgb(255, 255, 255)",
+  "backgroundColor": "rgb(197, 31, 31)",
+  "logoText": "iVeew",
+  "locations": [
+    {
+      "latitude": 52.497181,
+      "longitude": 13.384972
+    },
+    {
+      "latitude": 50.014984,
+      "longitude": 36.220155
+    }
+  ],
+  "relevantDate": "2014-04-04",
+  "barcode": {
+    "messageEncoding": "utf-8",
+    "format": "PKBarcodeFormatQR",
+    "message": "{\"pass_type_id\":\"pass.com.codekollektiv.balance\",\"serial_number\":\"41690e30ed345c3c692f0caf655201af\",\"authentication_token\":\"bd360c267057ccea7d474c26ab1b1096\"}"
+  },
+  "storeCard": {
+    "primaryFields": [
+      {
+        "key": "balance",
+        "label": "Balance",
+        "value": 100.0,
+        "currencyCode": "EUR",
+        "changeMessage": "Balance updated to %@."
+      }
+    ],
+    "secondaryFields": [
+      {
+        "key": "fullName",
+        "label": "Name",
+        "value": "Tom"
+      }
+    ],
+    "auxiliaryFields": [
+      {
+        "key": "level",
+        "label": "LEVEL",
+        "value": "Platinum"
+      },
+      {
+        "key": "favorite",
+        "label": "FAVORITE TOY",
+        "value": "Bucky Ball Magnets",
+        "textAlignment": "PKTextAlignmentRight"
+      }
+    ],
+    "backFields": [
+      {
+        "numberStyle": "PKNumberStyleSpellOut",
+        "label": "spelled out",
+        "key": "numberStyle",
+        "value": 200
+      },
+      {
+        "label": "in Reals",
+        "key": "currency",
+        "value": 200,
+        "currencyCode": "BRL"
+      },
+      {
+        "dateStyle": "PKDateStyleFull",
+        "label": "full date",
+        "key": "dateFull",
+        "value": "1980-05-07T10:00-05:00"
+      },
+      {
+        "label": "full time",
+        "key": "timeFull",
+        "value": "1980-05-07T10:00-05:00",
+        "timeStyle": "PKDateStyleFull"
+      },
+      {
+        "dateStyle": "PKDateStyleShort",
+        "label": "short date and time",
+        "key": "dateTime",
+        "value": "1980-05-07T10:00-05:00",
+        "timeStyle": "PKDateStyleShort"
+      },
+      {
+        "dateStyle": "PKDateStyleShort",
+        "label": "relative date",
+        "key": "relStyle",
+        "value": "2013-04-24T10:00-05:00",
+        "isRelative": true
+      }
+    ]
+  }
+}
