@@ -1,0 +1,11 @@
+source 'https://rubygems.org'
+
+gem 'sinatra'
+gem 'sequel'
+gem 'sqlite3'
+gem 'rubyzip'
+gem 'rack'
+#gem 'yaml'
+gem 'json'
+gem 'terminal-table'
+gem 'uuid'

@@ -11,7 +11,7 @@ require './pass_server'
 use Rack::MethodOverride
 
 # Pass Server Settings
-PassServer.set :hostname, "roket.us"
+PassServer.set :hostname, "http://107.170.50.205/"
 PassServer.set :port, 80
 PassServer.set :pass_type_identifier, "pass.co.iveew"
 PassServer.set :team_identifier, "TH6A6P"
