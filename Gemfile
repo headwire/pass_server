@@ -10,6 +10,6 @@ gem 'json'
 gem 'terminal-table'
 gem 'uuid'
 #
-gem 'socket'
+#gem 'socket'
 gem 'sign_pass', '1.0.0', :path => 'lib/'
 #gem 'securerandom'
