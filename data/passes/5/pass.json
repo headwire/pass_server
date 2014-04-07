@@ -24,7 +24,7 @@
   "barcode": {
     "messageEncoding": "utf-8",
     "format": "PKBarcodeFormatQR",
-    "message": "{\"pass_type_id\":\"pass.com.codekollektiv.balance\",\"serial_number\":\"1a5fb98e4d0f3e198ee02d34bb898b80\",\"authentication_token\":\"daba365c3c24ef2cf0f07857f94dabdf\"}"
+    "message": "{\"pass_type_id\":\"pass.com.iveew.balance\",\"serial_number\":\"1a5fb98e4d0f3e198ee02d34bb898b80\",\"authentication_token\":\"daba365c3c24ef2cf0f07857f94dabdf\"}"
   },
   "storeCard": {
     "primaryFields": [
