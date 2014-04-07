@@ -1,0 +1,47 @@
+{
+  "passTypeIdentifier": "pass.co.iveew",
+  "formatVersion": 1,
+  "organizationName": "iVeew",
+  "serialNumber": "fcd55723d3b4e500327e44b80ca97597",
+  "teamIdentifier": "TH6A6P",
+  "webServiceURL": "http://headwire.local:4567/",
+  "authenticationToken": "3a267840de3cc54dcdb64f90073c4d05",
+  "description": "iVeew Pass",
+  "foregroundColor": "#FFFFFF",
+  "backgroundColor": "#631313",
+  "logoText": "iVeew",
+  "locations": [
+    {
+      "latitude": 52.497181,
+      "longitude": 13.384972
+    },
+    {
+      "latitude": 50.014984,
+      "longitude": 36.220155
+    }
+  ],
+  "relevantDate": "2014-04-04",
+  "barcode": {
+    "messageEncoding": "utf-8",
+    "format": "PKBarcodeFormatQR",
+    "message": "{\"pass_type_id\":\"pass.com.codekollektiv.balance\",\"serial_number\":\"fcd55723d3b4e500327e44b80ca97597\",\"authentication_token\":\"3a267840de3cc54dcdb64f90073c4d05\"}"
+  },
+  "storeCard": {
+    "primaryFields": [
+      {
+        "key": "balance",
+        "label": "Balance",
+        "value": 100.0,
+        "currencyCode": "EUR",
+        "changeMessage": "Balance updated to %@."
+      }
+    ],
+    "secondaryFields": [
+      {
+        "key": "fullName",
+        "label": "Name",
+        "value": "Y"
+      }
+    ]
+  }
+}
