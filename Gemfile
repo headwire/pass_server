@@ -11,5 +11,5 @@ gem 'terminal-table'
 gem 'uuid'
 #
 gem 'socket'
-gem 'sign_pass', '1.0.0', :path => 'lib/sign_pass-1.0.0.gem'
+gem 'sign_pass', '1.0.0', :path => 'lib/'
 gem 'securerandom'
