@@ -17,8 +17,11 @@ PassServer.set :pass_type_identifier, "pass.co.iveew"
 PassServer.set :team_identifier, "TH6A6P"
 
 # Ask user for certificate password
-puts "Please enter your certificate password: "
-password_input = gets.chomp
-PassServer.set :certificate_password, password_input
+#puts "Please enter your certificate password: "
+#password_input = gets.chomp
+#PassServer.set :certificate_password, password_input
+
+# OR set predefined:
+PassServer.set :certificate_password, "CegthCathjbl"
 
 run PassServer
