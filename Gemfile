@@ -13,3 +13,7 @@ gem 'uuid'
 #gem 'socket'
 gem 'sign_pass', '1.0.0', :path => 'lib/'
 #gem 'securerandom'
+#
+# debugging
+gem 'pry'
+gem 'pry-remote'

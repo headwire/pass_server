@@ -23,17 +23,20 @@ class ReferenceServerSetup
   attr_accessor :db, :db_file, :hostname, :port, :pass_type_identifier
 
   def initialize
+    #debugginf with pry gem
+    #binding.remote_pry
+
     self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
-    self.hostname = "tiefflieger.local"
-    self.port = 4567
-    self.pass_type_identifier = "pass.com.iveew.balance"
+    self.hostname = "roket.us"
+    self.port = 8080
+    self.pass_type_identifier = "pass.us.roket.balance"
   end
 
   def setup_hostname
     # json_ip = open('http://jsonip.com'){|f| JSON.parse(f.read)}
     # hostname = collect_user_input("Please enter the hostname or ip address for the server [%@]:", json_ip["ip"], "The hostname is set to %@")
     # self.hostname = hostname
-    self.hostname = "tiefflieger.local"
+    self.hostname = "roket.us"
   end
 
   def setup_webserver_port
@@ -41,12 +44,12 @@ class ReferenceServerSetup
     # port = collect_user_input("Please enter a port to use for the webserver [%@]:", default_port, "The webserver port it set to %@")
     # self.port = port
 
-    self.port = 4567
+    self.port = 8080
   end
 
   def setup_pass_type_identifier
     # self.pass_type_identifier = collect_user_input("Please enter the passTypeIdentifer associated with your certificate:", "", "The passTypeIdentifer is set to %@")
-    self.pass_type_identifier = "pass.com.iveew.balance"
+    self.pass_type_identifier = "pass.us.roket.balance"
   end
 
   def get_certificate_path
@@ -145,7 +148,7 @@ class ReferenceServerSetup
   def add_pass_for_user(user_id)
     serial_number = SecureRandom.hex
     authentication_token = SecureRandom.hex
-    add_pass(serial_number, authentication_token, "pass.com.iveew.balance", user_id)
+    add_pass(serial_number, authentication_token, settings.pass_type_identifier, user_id)
   end
 
   def add_pass(serial_number, authentication_token, pass_type_id, user_id)

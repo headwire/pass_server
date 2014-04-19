@@ -295,7 +295,8 @@ class PassServer < Sinatra::Base
 
   ###
   # End of development-only endpoints.
-  ###############
+  ####################################
+  ####################################
 
 
   private
@@ -339,7 +340,7 @@ class PassServer < Sinatra::Base
   def add_pass_for_user(user_id)
     serial_number = new_serial_number
     auth_token = new_authentication_token
-    add_pass(serial_number, auth_token, "pass.com.iveew.balance", user_id)
+    add_pass(serial_number, auth_token, settings.pass_type_identifier, user_id)
   end
 
   def add_pass(serial_number, authentication_token, pass_type_id, user_id)
