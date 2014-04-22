@@ -27,16 +27,16 @@ class ReferenceServerSetup
     #binding.remote_pry
 
     self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
-    self.hostname = "roket.us"
+    self.hostname = "107.170.50.205"
     self.port = 8080
-    self.pass_type_identifier = "pass.us.roket.balance"
+    self.pass_type_identifier = "pass.co.iveew"
   end
 
   def setup_hostname
     # json_ip = open('http://jsonip.com'){|f| JSON.parse(f.read)}
     # hostname = collect_user_input("Please enter the hostname or ip address for the server [%@]:", json_ip["ip"], "The hostname is set to %@")
     # self.hostname = hostname
-    self.hostname = "roket.us"
+    self.hostname = "107.170.50.205"
   end
 
   def setup_webserver_port
@@ -49,7 +49,7 @@ class ReferenceServerSetup
 
   def setup_pass_type_identifier
     # self.pass_type_identifier = collect_user_input("Please enter the passTypeIdentifer associated with your certificate:", "", "The passTypeIdentifer is set to %@")
-    self.pass_type_identifier = "pass.us.roket.balance"
+    self.pass_type_identifier = "pass.co.iveew"
   end
 
   def get_certificate_path

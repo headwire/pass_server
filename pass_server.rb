@@ -45,7 +45,8 @@ class PassServer < Sinatra::Base
   # --> if not authorized: 401
   #
   post '/v1/devices/:device_id/registrations/:pass_type_id/:serial_number' do
-    puts "#<RegistrationRequest device_id: #{params[:device_id]}, pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}, push_token: #{push_token}>"
+    "#<RegistrationRequest device_id: #{params[:device_id]}, pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}, push_token: #{push_token}>"
+    binding.remote_pry
 
     # Validate that the request is authorized to deal with the pass referenced
     if is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
@@ -209,7 +210,7 @@ class PassServer < Sinatra::Base
   end
 
 
-  ################
+  ###############################
   # FOR DEVELOPMENT PURPOSES ONLY
   # These endpoints allow developers to create/edit users and download passes.
   #

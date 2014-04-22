@@ -12,9 +12,9 @@ require 'pry-remote'
 use Rack::MethodOverride
 
 # Pass Server Settings
-PassServer.set :hostname, "http://107.170.50.205/"
+PassServer.set :hostname, "107.170.50.205"
 PassServer.set :port, 8080
-PassServer.set :pass_type_identifier, "pass.us.roket.balance"
+PassServer.set :pass_type_identifier, "pass.co.iveew"
 PassServer.set :team_identifier, "TH6A6P"
 
 # Ask user for certificate password
