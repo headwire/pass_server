@@ -5,7 +5,7 @@ require 'yaml'
 require 'json'
 require 'socket'
 
-require 'sign_pass'
+#require 'sign_pass'
 
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
@@ -479,6 +479,7 @@ class PassServer < Sinatra::Base
     end
 
     # Generate and sign the new pass
+    byebug
     pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
     pass_signer.sign_pass!
 
