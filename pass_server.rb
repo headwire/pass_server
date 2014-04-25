@@ -480,8 +480,8 @@ class PassServer < Sinatra::Base
 
     # Generate and sign the new pass
     byebug
-    pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
-    pass_signer.sign_pass!
+    #pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
+    #pass_signer.sign_pass!
 
     # Send the pass file
     puts '[ ok ] Sending pass file.'
