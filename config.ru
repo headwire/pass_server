@@ -6,7 +6,8 @@
 #
 
 require './pass_server'
-require 'pry-remote'
+#require 'pry-remote'
+require 'byebug'
 
 # Used to implement HTTP PUT and DELETE with HTTP POST and _method
 use Rack::MethodOverride

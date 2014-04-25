@@ -24,7 +24,7 @@ class ReferenceServerSetup
 
   def initialize
     #debugginf with pry gem
-    #binding.remote_pry
+    #binding.pry
 
     self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
     self.hostname = "107.170.50.205"

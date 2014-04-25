@@ -8,12 +8,21 @@ require 'sign_pass'
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
 
+#require 'pry-remote'
+require 'byebug'
+
+
 class PassServer < Sinatra::Base
   attr_accessor :db, :users, :passes, :registrations
 
   configure do
     # Register MIME type for pass files
     mime_type :pkpass, 'application/vnd.apple.pkpass'
+
+    # Put all logging to STDOUT = local console
+    if defined?(Rails) && (Rails.env == 'development')
+      Rails.logger = Logger.new(STDOUT)
+    end
   end
 
   before do
@@ -46,7 +55,7 @@ class PassServer < Sinatra::Base
   #
   post '/v1/devices/:device_id/registrations/:pass_type_id/:serial_number' do
     "#<RegistrationRequest device_id: #{params[:device_id]}, pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}, push_token: #{push_token}>"
-    binding.remote_pry
+    #byebug
 
     # Validate that the request is authorized to deal with the pass referenced
     if is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
@@ -92,6 +101,7 @@ class PassServer < Sinatra::Base
   #
   get '/v1/devices/:device_id/registrations/:pass_type_id?' do
     puts "#<UpdateRequest device_id: #{params[:device_id]}, pass_type_id: #{params[:pass_type_id]}#{", passesUpdatedSince: " + params[:passesUpdatedSince] if params[:passesUpdatedSince] && params[:passesUpdatedSince] != ""}>"
+    byebug
 
     # Check first that the device has registered with the service
     if device_has_any_registrations?(params[:device_id])
@@ -311,6 +321,9 @@ class PassServer < Sinatra::Base
     now = DateTime.now
     p[:created_at] = now
     p[:updated_at] = now
+
+    byebug
+
     new_user_id = self.users.insert(p)
 
     # Also create a pass for the new user
