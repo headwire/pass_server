@@ -16,6 +16,7 @@ require 'fileutils'
 require 'optparse'
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/apns.rb'
+require 'byebug'
 
 
 
@@ -53,7 +54,8 @@ class ReferenceServerSetup
   end
 
   def get_certificate_path
-    certDirectory = File.dirname(File.expand_path(__FILE__)) + "/../Data/Certificate"
+    certDirectory = File.dirname(File.expand_path(__FILE__)) + "/../data/Certificate"
+    byebug
     certs = Dir.glob("#{certDirectory}/*.p12")
     if  certs.count ==0
       puts "Couldn't find a certificate at #{certDirectory}"
@@ -165,6 +167,7 @@ class ReferenceServerSetup
 
   def create_pass_data_for_pass(pass_id)
     passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/../data/passes"
+    byebug
     template_folder_path = passes_folder_path + "/template"
     target_folder_path = passes_folder_path + "/#{pass_id}"
 
