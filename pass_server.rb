@@ -1,10 +1,10 @@
 require 'sinatra/base'
 require 'sequel'
 require 'sqlite3'
-require 'yaml'
+#require 'yaml'
 require 'json'
-require 'socket'
-
+#require 'socket'
+byebug
 require 'sign_pass'
 
 require 'securerandom'
