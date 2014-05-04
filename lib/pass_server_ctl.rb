@@ -24,10 +24,9 @@ class ReferenceServerSetup
   attr_accessor :db, :db_file, :hostname, :port, :pass_type_identifier
 
   def initialize
-    #debugginf with pry gem
-    #binding.pry
-
-    self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
+    byebug
+    #self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
+    self.db_file = File.expand_path('../../data/pass_server.sqlite3', __FILE__)
     self.hostname = "107.170.50.205"
     self.port = 8080
     self.pass_type_identifier = "pass.co.iveew"
@@ -54,7 +53,8 @@ class ReferenceServerSetup
   end
 
   def get_certificate_path
-    certDirectory = File.dirname(File.expand_path(__FILE__)) + "/../data/Certificate"
+    #certDirectory = File.dirname(File.expand_path(__FILE__)) + "/../data/Certificate"
+    certDirectory = File.expand_path('../../data/Certificate/', __FILE__)
     byebug
     certs = Dir.glob("#{certDirectory}/*.p12")
     if  certs.count ==0
@@ -166,7 +166,8 @@ class ReferenceServerSetup
   end
 
   def create_pass_data_for_pass(pass_id)
-    passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/../data/passes"
+    #passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/../data/passes"
+    passes_folder_path = File.expand_path('../../data/passes/', __FILE__)
     byebug
     template_folder_path = passes_folder_path + "/template"
     target_folder_path = passes_folder_path + "/#{pass_id}"

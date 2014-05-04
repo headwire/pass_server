@@ -5,7 +5,7 @@ require 'yaml'
 require 'json'
 require 'socket'
 
-#require 'sign_pass'
+require 'sign_pass'
 
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
