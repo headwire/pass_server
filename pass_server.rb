@@ -7,11 +7,11 @@ require 'sqlite3'
 require 'json'
 #require 'socket'
 byebug
-require 'sign_pass.rb'
 
 require 'securerandom'
 #require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
 require File.expand_path('../lib/apns.rb', __FILE__)
+require File.expand_path('../lib/sign_pass.rb', __FILE__)
 
 
 class PassServer < Sinatra::Base
