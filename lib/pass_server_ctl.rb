@@ -16,6 +16,7 @@ require 'fileutils'
 require 'optparse'
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/apns.rb'
+
 require 'byebug'
 
 

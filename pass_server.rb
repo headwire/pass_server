@@ -7,10 +7,11 @@ require 'sqlite3'
 require 'json'
 #require 'socket'
 byebug
-require 'sign_pass'
+require 'sign_pass.rb'
 
 require 'securerandom'
-require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
+#require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
+require File.expand_path('../lib/apns.rb', __FILE__)
 
 
 class PassServer < Sinatra::Base
@@ -479,8 +480,8 @@ class PassServer < Sinatra::Base
 
     # Generate and sign the new pass
     byebug
-    #pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
-    #pass_signer.sign_pass!
+    pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
+    pass_signer.sign_pass!
 
     # Send the pass file
     puts '[ ok ] Sending pass file.'
