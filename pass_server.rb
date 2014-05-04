@@ -1,3 +1,5 @@
+require 'byebug'
+
 require 'sinatra/base'
 require 'sequel'
 require 'sqlite3'
@@ -9,9 +11,6 @@ require 'sign_pass'
 
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/lib/apns.rb'
-
-#require 'pry-remote'
-require 'byebug'
 
 
 class PassServer < Sinatra::Base
