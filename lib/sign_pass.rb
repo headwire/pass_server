@@ -201,7 +201,7 @@ class SignPass
     puts "Compressing the pass"
     zipped_file = File.open(self.output_url, "w")
 byebug
-    Zip::ZipOutputStream.open(zipped_file.path) do |z|
+    Zip::OutputStream.open(zipped_file.path) do |z|
       Dir.glob(self.temporary_path + "/**").each do |file|
         z.put_next_entry(File.basename(file))
         z.print IO.read(file)
