@@ -16,7 +16,7 @@ require File.expand_path('../lib/sign_pass.rb', __FILE__)
 
 class PassServer < Sinatra::Base
   attr_accessor :db, :users, :passes, :registrations
-byebug
+
   ::Logger.class_eval { alias :write :'<<' }
   access_logger = ::Logger.new( ::File.new("log/pass_server.access.log", "a+") )
   error_logger = ::File.new("log/pass_server.error.log", "a+")
