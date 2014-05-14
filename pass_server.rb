@@ -26,7 +26,6 @@ class PassServer < Sinatra::Base
     # Register MIME type for pass files
     mime_type :pkpass, 'application/vnd.apple.pkpass'
 
-    #LOGGER ||= Logger.new("log/pass_server.log")
     enable :logging, :dump_errors
     set :raise_errors, true
     use ::Rack::CommonLogger, access_logger
@@ -249,6 +248,7 @@ class PassServer < Sinatra::Base
 
   # List of users
   get "/users" do
+    byebug
     ordered_users = self.users.order(:name).all
     if request.accept.include? "application/json"
       content_type 'application/json', :charset => 'utf-8'

@@ -26,6 +26,7 @@ class ReferenceServerSetup
 
   def initialize
     #self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
+    byebug
     self.db_file = File.expand_path('../../data/pass_server.sqlite3', __FILE__)
     self.hostname = "107.170.50.205"
     self.port = 8080
