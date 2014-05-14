@@ -25,7 +25,6 @@ class ReferenceServerSetup
   attr_accessor :db, :db_file, :hostname, :port, :pass_type_identifier
 
   def initialize
-    byebug
     #self.db_file =  File.dirname(File.expand_path(__FILE__)) + "/../data/pass_server.sqlite3"
     self.db_file = File.expand_path('../../data/pass_server.sqlite3', __FILE__)
     self.hostname = "107.170.50.205"
@@ -56,7 +55,6 @@ class ReferenceServerSetup
   def get_certificate_path
     #certDirectory = File.dirname(File.expand_path(__FILE__)) + "/../data/Certificate"
     certDirectory = File.expand_path('../../data/Certificate/', __FILE__)
-    byebug
     certs = Dir.glob("#{certDirectory}/*.p12")
     if  certs.count ==0
       puts "Couldn't find a certificate at #{certDirectory}"
@@ -91,6 +89,8 @@ class ReferenceServerSetup
         Float :account_balance
         DateTime :created_at
         DateTime :updated_at
+        # THIS IS ONLY IN DEVELOPMENT MODE
+        String :device_id
       end
     end
   end
@@ -139,8 +139,9 @@ class ReferenceServerSetup
   def add_user(email, name, account_balance)
     users = self.db[:users]
     now = DateTime.now
-    users.insert(:email => email, :name => name, :account_balance => account_balance, :created_at => now, :updated_at => now)
-    puts "<#User email: #{email} name: #{name} account_balance: #{account_balance}>"
+    users.insert(:email => email, :name => name, :account_balance => account_balance, :created_at => now, :updated_at => now,
+                  :device_id => "nil") # THIS IS ONLY IN DEVELOPMENT MODE
+    puts "<#User email: #{email} name: #{name} account_balance: #{account_balance} device_id: 'nil'>"
   end
 
   def delete_user(user_id)
@@ -169,7 +170,7 @@ class ReferenceServerSetup
   def create_pass_data_for_pass(pass_id)
     #passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/../data/passes"
     passes_folder_path = File.expand_path('../../data/passes/', __FILE__)
-    byebug
+    #byebug
     template_folder_path = passes_folder_path + "/template"
     target_folder_path = passes_folder_path + "/#{pass_id}"
 

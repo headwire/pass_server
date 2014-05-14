@@ -1,4 +1,5 @@
 require 'byebug'
+require 'logger'
 
 require 'sinatra/base'
 require 'sequel'
@@ -15,15 +16,20 @@ require File.expand_path('../lib/sign_pass.rb', __FILE__)
 
 class PassServer < Sinatra::Base
   attr_accessor :db, :users, :passes, :registrations
+byebug
+  ::Logger.class_eval { alias :write :'<<' }
+  access_logger = ::Logger.new( ::File.new("log/pass_server.access.log", "a+") )
+  error_logger = ::File.new("log/pass_server.error.log", "a+")
+  error_logger.sync = true
 
-  configure do
+  configure :production, :development do
     # Register MIME type for pass files
     mime_type :pkpass, 'application/vnd.apple.pkpass'
 
-    # Put all logging to STDOUT = local console
-    if defined?(Rails) && (Rails.env == 'development')
-      Rails.logger = Logger.new(STDOUT)
-    end
+    #LOGGER ||= Logger.new("log/pass_server.log")
+    enable :logging, :dump_errors
+    set :raise_errors, true
+    use ::Rack::CommonLogger, access_logger
   end
 
   before do
@@ -32,6 +38,8 @@ class PassServer < Sinatra::Base
     self.users ||= self.db[:users]
     self.passes ||= self.db[:passes]
     self.registrations ||= self.db[:registrations]
+    # set up default rack logger
+    env["rack.errors"] =  error_logger
   end
 
 
@@ -43,7 +51,7 @@ class PassServer < Sinatra::Base
   # JSON payload: { "pushToken" : <push token, which the server needs to send push notifications to this device> }
   #
   # Params definition
-  # :device_id      - the device's identifier
+  # :device_id      - the device's library identifier
   # :pass_type_id   - the bundle identifier for a class of passes, sometimes refered to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
   # :serial_number  - the pass' serial number
   # :pushToken      - the value needed for Apple Push Notification service
@@ -55,8 +63,8 @@ class PassServer < Sinatra::Base
   # --> if not authorized: 401
   #
   post '/v1/devices/:device_id/registrations/:pass_type_id/:serial_number' do
+
     "#<RegistrationRequest device_id: #{params[:device_id]}, pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}, push_token: #{push_token}>"
-    #byebug
 
     # Validate that the request is authorized to deal with the pass referenced
     if is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
@@ -67,6 +75,10 @@ class PassServer < Sinatra::Base
         # No registration found, lets add the device
         puts '[ ok ] Registering device.'
         add_device_registration(params[:device_id], push_token, params[:pass_type_id], params[:serial_number])
+        # this one is for development ONLY
+        # device_id generated on the server side, but should be generatad on client side (!)
+        #byebug
+        #add_device_registration(new_device_id, push_token, params[:pass_type_id], params[:serial_number])
 
         # Return a 201 CREATED status
         status 201
@@ -88,7 +100,7 @@ class PassServer < Sinatra::Base
 
   # Updatable passes
   #
-  # get all serial #s associated with a device for passes that need an update
+  # get all serial No.s associated with a device for passes that need an update
   # Optionally with a query limiter to scope the last update since
   #
   # GET /v1/devices/<deviceID>/registrations/<typeID>
@@ -101,8 +113,8 @@ class PassServer < Sinatra::Base
   # --> if unknown device identifier: 404
   #
   get '/v1/devices/:device_id/registrations/:pass_type_id?' do
+
     puts "#<UpdateRequest device_id: #{params[:device_id]}, pass_type_id: #{params[:pass_type_id]}#{", passesUpdatedSince: " + params[:passesUpdatedSince] if params[:passesUpdatedSince] && params[:passesUpdatedSince] != ""}>"
-    byebug
 
     # Check first that the device has registered with the service
     if device_has_any_registrations?(params[:device_id])
@@ -322,8 +334,11 @@ class PassServer < Sinatra::Base
     now = DateTime.now
     p[:created_at] = now
     p[:updated_at] = now
+    # FOR DEVELOPMENT ONLY
+    p[:device_id] = 'nil';
+    #
 
-    byebug
+    #byebug
 
     new_user_id = self.users.insert(p)
 
@@ -360,12 +375,15 @@ class PassServer < Sinatra::Base
 
   def add_pass(serial_number, authentication_token, pass_type_id, user_id)
     now = DateTime.now
+    #byebug
     self.passes.insert(:serial_number => serial_number, :authentication_token => authentication_token, :pass_type_id => pass_type_id, :user_id => user_id, :created_at => now, :updated_at => now)
   end
 
   def add_device_registration(device_id, push_token, pass_type_identifier, serial_number)
+    #byebug
+    now = DateTime.now
     uuid = registration_uuid_for_device(device_id, serial_number)
-    self.registrations.insert(:uuid => uuid, :device_id => device_id, :pass_type_id => pass_type_identifier, :push_token => push_token, :serial_number => serial_number)
+    self.registrations.insert(:uuid => uuid, :device_id => device_id, :pass_type_id => pass_type_identifier, :push_token => push_token, :serial_number => serial_number, :created_at => now, :updated_at => now)
   end
 
   def delete_device_registration(device_id, serial_number)
@@ -448,6 +466,10 @@ class PassServer < Sinatra::Base
     puts "[ ok ] Creating pass data from template."
     FileUtils.cp_r template_folder_path + "/.", target_folder_path
 
+    ######################
+    # here should be 'get json pass template/payload from DB'
+    ######################
+    #********************************************************
     # Modify the pass json
     puts "[ ok ] Updating pass data."
     json_file_path = target_folder_path + "/pass.json"
@@ -460,6 +482,7 @@ class PassServer < Sinatra::Base
     pass_json["barcode"]["message"] = barcode_string_for_pass(pass)
     pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
     pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
+    #********************************************************
 
     # Write out the updated JSON
     File.open(json_file_path, "w") do |f|
@@ -478,7 +501,7 @@ class PassServer < Sinatra::Base
     end
 
     # Generate and sign the new pass
-    byebug
+    #byebug
     pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
     pass_signer.sign_pass!
 
@@ -491,7 +514,7 @@ class PassServer < Sinatra::Base
     APNS.certificate_password = settings.certificate_password
     APNS.instance.open_connection("production")
     puts "Opening connection to APNS."
-
+    #byebug
     # Get the list of registered devices and send a push notification
     pass = self.passes.where(:id => pass_id).first
     push_tokens = self.registrations.where(:serial_number => pass[:serial_number]).collect{|r| r[:push_token]}.uniq
@@ -562,4 +585,34 @@ class PassServer < Sinatra::Base
       end
     end
   end
+
+  ##########################
+  # Generating new device_id for newly registered device, for given user
+  def new_device_id #(user_id)
+    new_device_id = SecureRandom.hex
+
+    # update user with newly generated device_id
+    # ONLY FOR DEVELOPMENT
+    #if add_device_id_for_user(user_id, new_device_id)
+    #  new_device_id
+    #else
+    #  raise "Can\'t add new_device_id for user with id: #{user_id}"
+    #end
+  end
+
+  def add_device_id_for_user(user_id, device_id)
+    begin
+      # update user with newly generated device_id
+      user = self.users.where(:user_id => user_id)
+      user.update(:device_id => device_id)
+    rescue Exception
+      # we just ingest all errors
+      puts "Exception in add_device_id_for_user #{$!}"
+      err = true
+    else
+      err = false
+    end
+  end
+  ##########################
+
 end

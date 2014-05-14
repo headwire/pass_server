@@ -52,7 +52,7 @@ class APNS
     return context
   end
 
-  def open_connection(environment='sandbox')
+  def open_connection(environment='production') #sandbox ? production
     if self.certificate.class != OpenSSL::SSL::SSLContext
       load_certificate
     end
