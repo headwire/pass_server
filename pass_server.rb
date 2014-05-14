@@ -248,7 +248,6 @@ class PassServer < Sinatra::Base
 
   # List of users
   get "/users" do
-    byebug
     ordered_users = self.users.order(:name).all
     if request.accept.include? "application/json"
       content_type 'application/json', :charset => 'utf-8'
