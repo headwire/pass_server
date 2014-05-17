@@ -29,6 +29,10 @@ class PassServer < Sinatra::Base
     enable :logging, :dump_errors
     set :raise_errors, true
     use ::Rack::CommonLogger, access_logger
+
+    # !!! FOR DEVELOPMENT ONLY !!!
+    # hard-coded credentials for developer auth
+    CREDENTIALS = ['dev@iveew.co', 'apideveloper']
   end
 
   before do
@@ -37,8 +41,12 @@ class PassServer < Sinatra::Base
     self.users ||= self.db[:users]
     self.passes ||= self.db[:passes]
     self.registrations ||= self.db[:registrations]
+
     # set up default rack logger
     env["rack.errors"] =  error_logger
+
+    # set default content_type application/json for all responses
+    #content_type :json, :charset => 'utf-8'
   end
 
 
@@ -81,6 +89,7 @@ class PassServer < Sinatra::Base
 
         # Return a 201 CREATED status
         status 201
+        #headers
       else
         # The device has already registered for updates on this pass
         # Acknowledge the request with a 200 OK response
@@ -99,8 +108,8 @@ class PassServer < Sinatra::Base
 
   # Updatable passes
   #
-  # get all serial No.s associated with a device for passes that need an update
-  # Optionally with a query limiter to scope the last update since
+  # get all serial numbers for passes associated with a device (updatable passes list)
+  # Optionally with a query limiter to scope the last update since DateTime
   #
   # GET /v1/devices/<deviceID>/registrations/<typeID>
   # GET /v1/devices/<deviceID>/registrations/<typeID>?passesUpdatedSince=<tag>
@@ -188,6 +197,7 @@ class PassServer < Sinatra::Base
 
 
   # Pass delivery
+  # (Getting the Latest Version of a Pass)
   #
   # GET /v1/passes/<typeID>/<serial#>
   # Header: Authorization: ApplePass <authenticationToken>
@@ -196,10 +206,14 @@ class PassServer < Sinatra::Base
   # --> if auth token is correct: 200, with pass data payload
   # --> if auth token is incorrect: 401
   #
+  ## **
+  # Support standard HTTP caching on this endpoint:
+  # check for the If-Modified-Since header and return HTTP status code 304 if the pass has not changed.
   get '/v1/passes/:pass_type_id/:serial_number' do
     puts "#<PassDeliveryRequest pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}>"
     if is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
       puts '[ ok ] Pass and authentication token match.'
+      # If-Modified-Since header checked in deliver_pass method
       deliver_pass(params[:serial_number], params[:pass_type_id])
     else
       puts '[ fail ] Not authorized.'
@@ -247,13 +261,26 @@ class PassServer < Sinatra::Base
   end
 
   # List of users
+  #
+  # GET /users
+  # Header: Authorization: DevToken <dev_token>
+  # Header: Accept: application/json
+  #
+  # server response:
+  # --> list of users in JSON format: 200
+  #
+  # !!! CHECK FOR DEVELOPER API OAuth2 token !!!
   get "/users" do
     ordered_users = self.users.order(:name).all
-    if request.accept.include? "application/json"
-      content_type 'application/json', :charset => 'utf-8'
-      ordered_users.to_json
-    else
+    #byebug
+    if request.accept? "text/html"
       erb :'users/index.html', :locals => { :users => ordered_users }
+    elsif request.accept? "application/json"
+      content_type 'application/json', :charset => 'utf-8'
+      halt 200, ordered_users.to_json
+    else
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only text/html and application/json supported"
+      status 400
     end
   end
 
@@ -262,18 +289,116 @@ class PassServer < Sinatra::Base
   end
 
   # Create new user
+  # expects json user object
+  # request should contain valid dev_token for integrator
+  #
+  # POST /users
+  # Header: Authorization: DevToken <dev_token>
+  # JSON payload: {"user":{"name":"UserName", "email":"user@email.com", "account_balance":1111.0}}
+  # server response:
+  # return: { id : new_user_id, UserToken : <api_token> }
+  # --> if auth token is correct: 200, with pass data payload AND new api token returned
+  # --> if unsupported HTTP_ACCEPT Header provided: 400
+  # --> if json was malformated: 415
+  # --> if dev_token is incorrect: 401
+  # --> if DB insertion error: 500
   post "/users" do
-    add_user_with_params(params[:user])
-    redirect "/users"
+    #
+    # !!! check DevToken !!!
+    #
+    if request.accept? "text/html"
+      # this thread is for html-form post update <edit.html.erb>:
+      # <form action="/users/<%= user[:id] %>" method="post">
+      if params && params[:user]
+        add_user_with_params(params[:user])
+        redirect "/users"
+      end
+    elsif request.accept? "application/json"
+      # expect: {"user":{"name":"UserName", "email":"user@email.com", "account_balance":1111.0}}
+      # return: { :id => new_user_id, :api_token => p[:api_token] }
+      # check user object (in json paylod) for user params
+      if request && request.body
+        request.body.rewind
+        begin
+        json_body = JSON.parse(request.body.read)
+        # 415 Unsupported Media Type
+        # OR 422 Unprocessable Entity
+        # in case of wrong JSON format - exception raised
+        rescue
+          halt 415, 'json payload parsing error'
+        end
+
+        if json_body['user']
+          # curls with json payload:
+          # -d '{"user":{"name":"UserTwo", "email":"Second@user.com", "account_balance":1111.0}}'
+          # { :email => email, :name => name, :account_balance => account_balance }
+          # json_body["user"]["name"] - user object
+          id_and_token = add_user_with_params(json_body['user'])
+        end
+      end
+
+      if id_and_token
+        puts "[ ok ] new user was created successfully. user_id is #{id_and_token[:id]}"
+        content_type 'application/json', :charset => 'utf-8'
+        halt 200, id_and_token.to_json # here goes a new user's id and api_token
+      else
+        puts "[ fail ] user was not created"
+        content_type 'application/json', :charset => 'utf-8'
+        halt 500, 'DB Error'
+      end
+    else
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only application/json supported"
+      status 400
+    end
   end
 
+  # User Resource
+  # GET /users/<user_id>
+  # Header: Authorization: UserToken <api_token>
+  #
+  # server response:
+  # --> if Unsupported HTTP_ACCEPT Header: 400
+  # --> if Not authorized: 401
+  # --> if api token is correct and user exist: 200, User resource in JSON object
   get "/users/:user_id" do
     user = self.users.where(:id => params[:user_id]).first
-    if request.accept.include? "application/json"
-      content_type 'application/json', :charset => 'utf-8'
-      user.to_json
-    else
+    if request.accept? "text/html" #HTML requested
       erb :'users/show.html', :locals => { :user => user }
+    elsif request.accept? "application/json"
+      # !!! check UserToken !!!
+      if is_api_token_valid?(params[:user_id], authentication_token)
+        puts '[ ok ] api token is valid for given user'
+      else
+        halt 401, 'Invalid UserToken'
+      end
+
+      content_type 'application/json', :charset => 'utf-8'
+      halt 200, user.to_json
+    else
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only text/html and application/json supported"
+      status 400
+    end
+  end
+
+  # GET User's api_token
+  # here we should check developer/provider api token
+  # before sending him user's api_token
+  get "/users/:user_id/token/:dev_token" do
+    #
+    # !!! check for dev_token !!!
+    # puts '[ fail ] Not authorized.'
+    # status 401
+    user = self.users.where(:id => params[:user_id]).first || raise(Sinatra::NotFound)
+    #
+    # HTTP_ACCEPT Headers curl -H 'Accept:'
+    # request.accept?("text/html") #HTML requested
+    # request.accept?("application/json") #JSON requested
+    if request.accept? "application/json" #JSON requested
+      content_type 'application/json', :charset => 'utf-8'
+      user[:api_token].to_json
+    else
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only application/json supported"
+      status 400
     end
   end
 
@@ -283,25 +408,113 @@ class PassServer < Sinatra::Base
   end
 
   # Update one user's details
+  # expects json user object
+  # request should contain valid api_token for current user
+  #
+  # PUT /users/<user_id>
+  # Header: Authorization: UserToken <api_token>
+  # JSON payload: {"user":{"name":"UserName", "email":"user@email.com", "account_balance":1111.0}}
+  # server response:
+  # --> if auth token is correct: 200, with pass data payload AND new api token returned
+  # --> if unsupported HTTP_ACCEPT Header provided: 400
+  # --> if json was malformated: 415
+  # --> if api_token is incorrect: 401
+  # --> if user data are the same <account_balance>: 304
   put "/users/:user_id" do
-    update_user_with_params(params[:user_id], params[:user])
-    if request.accept.include? "application/json"
-      content_type 'application/json', :charset => 'utf-8'
-      status 200
+    if request.accept? "text/html"
+      # this thread is for html-form post update <edit.html.erb>:
+      # <form action="/users/<%= user[:id] %>" method="post">
+      if params && params[:user_id] && params[:user]
+        update_user_with_params(params[:user_id], params[:user])
+        redirect "/users"
+      end
+    elsif request.accept? "application/json"
+      # !!! check UserToken !!!
+      if is_api_token_valid?(params[:user_id], authentication_token)
+        puts '[ ok ] api token is valid for given user'
+      end
+      # check user object (in json paylod) for user params
+      # and updating user info
+      if request && request.body
+        request.body.rewind
+        begin
+        json_body = JSON.parse(request.body.read)
+        # 415 Unsupported Media Type
+        # OR 422 Unprocessable Entity
+        # in case of wrong JSON format - exception raised
+        rescue
+          halt 415, 'json payload parsing error'
+        end
+
+        if json_body['user']
+          # curls with json payload:
+          # -d '{"user":{"name":"UserTwo", "email":"Second@user.com", "account_balance":1111.0}}'
+          # json_body["user"]["name"] - user object
+          new_api_token = update_user_with_params(params[:user_id], json_body['user'])
+        end
+      end
+
+      if new_api_token
+        puts "[ ok ] user details for user #{params[:user_id]} was updated successfully"
+        content_type 'application/json', :charset => 'utf-8'
+        halt 200, { "UserToken"=> new_api_token.to_s }.to_json # here goes a new api_token, because old one was changed
+      else
+        puts "[ ok ] user details for user #{params[:user_id]} was NOT updated, because nothing to update"
+        content_type 'application/json', :charset => 'utf-8'
+        halt 304, 'nothing to update' # api_token remains old
+      end
     else
-      redirect "/users"
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only application/json supported"
+      status 400
     end
   end
 
+
   # Delete a user account
+  #
+  # DELETE /users/<user_id>
+  # Header: Authorization: UserToken <api_token>
+  # server response:
+  # --> if auth token is correct: 200
+  # --> if api_token is incorrect: 401
+  # --> if DB access error: 500
   delete "/users/:user_id" do
-    delete_user(params[:user_id])
-    redirect "/users"
+    if request.accept? "text/html"
+      if params && params[:user_id]
+        delete_user(params[:user_id])
+        redirect "/users"
+      end
+    elsif request.accept? "application/json"
+      # !!! check UserToken !!!
+      if is_api_token_valid?(params[:user_id], authentication_token)
+        puts '[ ok ] api token is valid for given user'
+      end
+
+      begin
+        delete_user(params[:user_id])
+      rescue
+        halt 500, 'DB access error'
+      else
+        halt 200, "user #{params[:user_id]} was deleted successfully"
+      end
+    end
+
   end
 
   # Download one user's pass
+  #
+  # GET /users/<user_id>/pass.pkpass
+  # server response:
+  # --> if pass exist: 200 and pkpass payload
+  # --> if DB access error: 500
   get "/users/:user_id/pass.pkpass" do
-    deliver_pass_for_user(params[:user_id])
+    begin
+      deliver_pass_for_user(params[:user_id])
+    rescue
+      halt 500, 'DB access error'
+    else
+      halt 200
+    end
   end
 
   # Retrieve the owner of the specified pass
@@ -335,31 +548,45 @@ class PassServer < Sinatra::Base
     p[:updated_at] = now
     # FOR DEVELOPMENT ONLY
     p[:device_id] = 'nil';
-    #
-
     #byebug
-
+    p[:api_token] = new_authentication_token
+    #byebug
     new_user_id = self.users.insert(p)
 
     # Also create a pass for the new user
     add_pass_for_user(new_user_id)
 
-    return new_user_id
+    return { :id => new_user_id, :api_token => p[:api_token] }
   end
 
   def update_user_with_params(user_id, p)
     now = DateTime.now
+    user_is_dirty = false
     p[:updated_at] = now
-    user = self.users.where(:id => user_id)
-    user.update(p)
-
-    # Also update updated_at field of user's pass
-    pass = self.passes.where(:user_id => user_id)
-    pass.update(:updated_at => now)
+    p[:api_token] = new_authentication_token
+    begin
+      user = self.users.where(:id => user_id) || raise(Sinatra::NotFound)
+      unless user.first[:account_balance] == p["account_balance"]
+        user.update(p)
+        user_is_dirty = true
+      end
+    rescue
+      halt 415, 'json paylod for user data is malformed or DB update error'
+    end
 
     # Send push notification
-    pass_id = pass.first[:id]
-    push_update_for_pass(pass_id)
+    # ONLY IF DATA FIELD (pass json paylod) have changed
+    # :account_balance
+    if user_is_dirty
+      # Also update updated_at field of user's pass
+      pass = self.passes.where(:user_id => user_id)
+      pass.update(:updated_at => now)
+
+      pass_id = pass.first[:id]
+      push_update_for_pass(pass_id)
+      # updaing user info causes new api token generation, for security reasons
+      p[:api_token]
+    end
   end
 
   def delete_user(user_id)
@@ -374,12 +601,10 @@ class PassServer < Sinatra::Base
 
   def add_pass(serial_number, authentication_token, pass_type_id, user_id)
     now = DateTime.now
-    #byebug
     self.passes.insert(:serial_number => serial_number, :authentication_token => authentication_token, :pass_type_id => pass_type_id, :user_id => user_id, :created_at => now, :updated_at => now)
   end
 
   def add_device_registration(device_id, push_token, pass_type_identifier, serial_number)
-    #byebug
     now = DateTime.now
     uuid = registration_uuid_for_device(device_id, serial_number)
     self.registrations.insert(:uuid => uuid, :device_id => device_id, :pass_type_id => pass_type_identifier, :push_token => push_token, :serial_number => serial_number, :created_at => now, :updated_at => now)
@@ -397,6 +622,16 @@ class PassServer < Sinatra::Base
       return true
     else
       return false
+    end
+  end
+
+  # Validate that the request has valid api_token
+  def is_api_token_valid?(user_id, user_token)
+    user = self.users.where(:id => user_id, :api_token => user_token).first
+    if user
+      return true
+    else
+      halt 401, 'api_token is incorrect'
     end
   end
 
@@ -445,10 +680,15 @@ class PassServer < Sinatra::Base
 
   def deliver_pass(serial_number, pass_type_identifier)
     # Load pass data from database
-    pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier).first
+    pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier).first || raise(Sinatra::NotFound)
+
+    # !!! @pass = self.passes.first(slug: id) || raise(Sinatra::NotFound)
+    #byebug
+    last_modified pass[:updated_at] # this helper will send 304 if pass not changed
+
     pass_id = pass[:id]
     user_id = pass[:user_id]
-    user = self.users.where(:id => user_id).first
+    user = self.users.where(:id => user_id).first || raise(Sinatra::NotFound)
 
     # Configure folder paths
     passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/data/passes"
@@ -500,7 +740,6 @@ class PassServer < Sinatra::Base
     end
 
     # Generate and sign the new pass
-    #byebug
     pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
     pass_signer.sign_pass!
 
@@ -511,6 +750,7 @@ class PassServer < Sinatra::Base
 
   def push_update_for_pass(pass_id)
     APNS.certificate_password = settings.certificate_password
+    #byebug
     APNS.instance.open_connection("production")
     puts "Opening connection to APNS."
     #byebug

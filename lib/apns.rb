@@ -1,6 +1,8 @@
 require 'singleton'
 #require 'socket'
 require 'openssl'
+require 'byebug'
+
 
 class APNS
   include Singleton
@@ -47,7 +49,7 @@ class APNS
 
     context.cert = p12_certificate.certificate
     context.key = p12_certificate.key
-
+    byebug
     # Return ssl certificate context
     return context
   end
@@ -56,7 +58,7 @@ class APNS
     if self.certificate.class != OpenSSL::SSL::SSLContext
       load_certificate
     end
-
+    byebug
     if environment == "production"
       self.socket = TCPSocket.new("gateway.push.apple.com", 2195)
     else
@@ -76,6 +78,7 @@ class APNS
   end
 
   def deliver(token, payload)
+    byebug
     notification_packet = self.generate_notification_packet(token, payload)
     APNS.instance.ssl_socket.write(notification_packet)
   end

@@ -91,6 +91,7 @@ class ReferenceServerSetup
         DateTime :updated_at
         # THIS IS ONLY IN DEVELOPMENT MODE
         String :device_id
+        String :api_token
       end
     end
   end
