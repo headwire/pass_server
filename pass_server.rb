@@ -243,7 +243,7 @@ class PassServer < Sinatra::Base
     puts "#<PassDeliveryRequest pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}>"
     if is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
       puts '[ ok ] Pass and authentication token match.'
-      byebug
+
       # If-Modified-Since header checked
       # Load pass data from database
       begin
@@ -555,7 +555,7 @@ class PassServer < Sinatra::Base
   # --> if DB access error: 500
   #
   get "/users/:user_id/pass.pkpass" do
-    byebug
+    #byebug
     begin
       deliver_pass_for_user(params[:user_id])
     rescue
@@ -596,7 +596,7 @@ class PassServer < Sinatra::Base
     get_all_passes_data.to_json
   end
 
-  # Create new Pass Data (pass.json data)
+  # Create new Pass Data Template (pass.json data)
   # expects json to create a new PassJson object
   # request should contain valid dev_token for integrator
   #
@@ -639,14 +639,14 @@ class PassServer < Sinatra::Base
           # DEV MODE !!!
           # change to JSON.parse(request.body.read)
           # ******
-          test_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/1/pass.json"
-          pass_json = JSON.parse(File.read(test_pass))
-          #pass_json = JSON.parse(request.body.read)
+          #test_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/1/pass.json"
+          #pass_json = JSON.parse(File.read(test_pass))
+          pass_json = JSON.parse(request.body.read)
 
           # 415 Unsupported Media Type
           # OR 422 Unprocessable Entity
           # in case of wrong JSON format - exception raised
-          byebug
+
           # loading pass.json schema to validate against
           pass_schema_path = File.dirname(File.expand_path(__FILE__)) + "/data/pass_schema.json"
           pass_schema = JSON.parse(File.read(pass_schema_path))
@@ -922,7 +922,7 @@ class PassServer < Sinatra::Base
     pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
     pass_signer.sign_pass!
 
-    byebug
+    #byebug
     # NOT sending BUT storing in DB
     # Send the pass file
     puts '[ ok ] Sending pass file.'
