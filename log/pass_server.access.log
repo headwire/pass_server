@@ -107,3 +107,13 @@
 127.0.0.1 - - [17/May/2014 16:54:02] "DELETE /users/5 HTTP/1.1" 200 31 8.0748
 127.0.0.1 - - [17/May/2014 16:54:16] "GET /users HTTP/1.1" 200 1374 3.6080
 127.0.0.1 - - [17/May/2014 17:03:18] "GET /users/1/pass.pkpass HTTP/1.1" 200 290467 62.7645
+127.0.0.1 - - [20/May/2014 13:55:05] "GET / HTTP/1.1" 200 399 0.0125
+127.0.0.1 - - [20/May/2014 13:55:08] "GET /users HTTP/1.1" 200 1374 0.0085
+127.0.0.1 - - [20/May/2014 13:55:23] "GET /__sinatra__/500.png HTTP/1.1" 304 - 0.0040
+127.0.0.1 - - [20/May/2014 13:56:55] "GET /passes HTTP/1.1" 200 371 12.2827
+127.0.0.1 - - [20/May/2014 19:46:20] "POST /passes/json/pass.co.iveew HTTP/1.1" 200 22 20.7420
+127.0.0.1 - - [20/May/2014 20:00:41] "POST /passes/json/pass.co.iveew HTTP/1.1" 200 220 59.4693
+127.0.0.1 - - [20/May/2014 20:07:25] "POST /passes/json/pass.co.iveew HTTP/1.1" 200 330 43.2225
+127.0.0.1 - - [20/May/2014 20:11:10] "POST /passes/json/pass.co.iveew HTTP/1.1" 200 333 2.7412
+127.0.0.1 - - [20/May/2014 21:52:11] "POST /passes/json/pass.co.iveew HTTP/1.1" 200 326 23.0309
+127.0.0.1 - - [20/May/2014 21:54:26] "POST /passes/json/pass.co.iveew HTTP/1.1" 200 218 31.2061

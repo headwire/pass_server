@@ -13,3 +13,7 @@ gem 'uuid'
 #gem 'sign_pass', '1.0.0', :path => 'lib/'
 # debugging
 gem 'byebug'
+gem 'data_mapper'
+gem 'dm-sqlite-adapter'
+gem 'mongo_mapper'
+gem 'json-schema'

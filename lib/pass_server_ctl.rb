@@ -16,9 +16,8 @@ require 'fileutils'
 require 'optparse'
 require 'securerandom'
 require File.dirname(File.expand_path(__FILE__)) + '/apns.rb'
-
+# debugger
 require 'byebug'
-
 
 
 class ReferenceServerSetup
@@ -239,8 +238,13 @@ class ReferenceServerSetup
   end
 
 end
+###########################
 
 
+
+##########################
+# cmd line options
+##########################
 options = {}
 optparse = OptionParser.new do |opts|
 
