@@ -1,7 +1,4 @@
-#  Pass Server reference implementation
-
 require './pass_server'
-#require 'byebug'
 
 # Used to implement HTTP PUT and DELETE with HTTP POST and _method
 use Rack::MethodOverride

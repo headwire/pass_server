@@ -101,10 +101,11 @@ class ReferenceServerSetup
       puts "Creating the passes table"
       self.db.create_table :passes do
         primary_key :id
-        foreign_key :user_id, :users, :on_delete => :cascade, :on_update => :cascade
+        foreign_key :user_id, :users, :null=>true, :on_delete => :cascade, :on_update => :cascade
         String :serial_number
         String :authentication_token
         String :pass_type_id
+        String :pass_type
         DateTime :created_at
         DateTime :updated_at
       end
@@ -117,6 +118,8 @@ class ReferenceServerSetup
       puts "Creating the registrations table"
       self.db.create_table :registrations do
         primary_key :id
+        foreign_key :pass_serial_number, :passes, :on_delete => :cascade, :on_update => :cascade
+        foreign_key :user_device_id, :users, :on_delete => :cascade, :on_update => :cascade
         String :uuid
         String :device_id
         String :push_token
@@ -127,6 +130,23 @@ class ReferenceServerSetup
       end
     end
   end
+
+  # JOIN TABLE
+  # ??? how do we tie users-devices-passes ???
+  #create_join_table
+  #create_join_table is a shortcut that you can use to create simple many-to-many join tables:
+  #
+  #create_join_table(:artist_id=>:artists, :album_id=>:albums)
+  #which expands to:
+  #
+  #create_table(:albums_artists) do
+  #  foreign_key :album_id, :albums, :null=>false
+  #  foreign_key :artist_id, :artists, :null=>false
+  #  primary_key [:album_id, :artist_id]
+  #  index [:artist_id, :album_id]
+  #end
+
+
 
   # def create_sample_pass
   #   passes = self.db[:passes]

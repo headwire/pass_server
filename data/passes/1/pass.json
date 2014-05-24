@@ -2,10 +2,10 @@
   "passTypeIdentifier": "pass.co.iveew",
   "formatVersion": 1,
   "organizationName": "iVeew",
-  "serialNumber": "a5bae32514b1360699782d110a8c2a18",
+  "serialNumber": "6d05e949f91aa1a510b318cfdb4657d4",
   "teamIdentifier": "TH6A6P",
   "webServiceURL": "http://107.170.50.205:8080/",
-  "authenticationToken": "95935d2324198ab3e467263270db26bb",
+  "authenticationToken": "4ce01dcbf02cb8aa4cf992f4cfbaf977",
   "description": "iVeew Pass",
   "foregroundColor": "rgb(255, 255, 255)",
   "backgroundColor": "rgb(55, 117, 50)",
@@ -24,14 +24,14 @@
   "barcode": {
     "messageEncoding": "utf-8",
     "format": "PKBarcodeFormatQR",
-    "message": "{\"pass_type_id\":\"pass.co.iveew\",\"serial_number\":\"a5bae32514b1360699782d110a8c2a18\",\"authentication_token\":\"95935d2324198ab3e467263270db26bb\"}"
+    "message": "{\"pass_type_id\":\"pass.co.iveew\",\"serial_number\":\"6d05e949f91aa1a510b318cfdb4657d4\",\"authentication_token\":\"4ce01dcbf02cb8aa4cf992f4cfbaf977\"}"
   },
   "storeCard": {
     "primaryFields": [
       {
         "key": "balance",
         "label": "Balance",
-        "value": 101.0,
+        "value": 743000000.0,
         "currencyCode": "EUR",
         "changeMessage": "Balance updated to %@."
       }
@@ -40,7 +40,7 @@
       {
         "key": "fullName",
         "label": "Name",
-        "value": "newOne"
+        "value": "New"
       }
     ],
     "auxiliaryFields": [

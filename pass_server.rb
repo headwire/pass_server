@@ -19,6 +19,14 @@ require_relative "lib/passes_json"
 require "dm-serializer"
 require 'json-schema'
 
+# helper for compare single var against multiple values
+class Object
+  def in? container
+    container.include? self
+  end
+end
+
+
 class PassServer < Sinatra::Base
   attr_accessor :db, :users, :passes, :registrations
 
@@ -35,6 +43,9 @@ class PassServer < Sinatra::Base
     # should add Rack::ShowExceptions here !!!
     # !!! but only for development mode !!!
     set :raise_errors, true
+    # This is needed for testing, otherwise the default
+    # error handler kicks in:
+    #set :show_exceptions, false
 
     use ::Rack::CommonLogger, access_logger
     # enabling encrypted, cookie-based sessions
@@ -50,15 +61,16 @@ class PassServer < Sinatra::Base
     if !File.exists?(json_db_file)
       File.open(json_db_file, "w"){}
     end
+
+    # to raise errors vs true/false returns:
+    # DataMapper::Model.raise_on_save_failure = true  # globally across all models
+    #
+    # possible DataMapper exceptions:
+    # rescue DataMapper::SaveFailureError => e
+    # # => DataMapper::UpdateConflictError: Zoo#update cannot be called on a dirty resource
+    #
     DataMapper.setup(:default, "sqlite3://#{json_db_file}")
     DataMapper.finalize.auto_upgrade!
-    #@pass_json = PassJson.create(
-    #  :serial      => "My Pass Serial No.",
-    #  :url       => "pass url for GET access",
-    #  :json_data  => "loooong json data",
-    #  :created_at => Time.now,
-    #  :updated_at => Time.now
-    #)
 
     # !!! FOR DEVELOPMENT ONLY !!!
     # hard-coded credentials for developer auth
@@ -76,7 +88,34 @@ class PassServer < Sinatra::Base
     env["rack.errors"] =  error_logger
 
     # set default content_type application/json for all responses
+    ### !!! production mode !!!
     #content_type :json, :charset => 'utf-8'
+  end
+
+  # Sinatra not found 'this ditty'
+  not_found do
+    'requested path not found'
+  end
+  # error handler for development
+  # will output all (or just 500, for ex.) errors in json format
+  # and also set a default error code
+  # * The error handler is invoked any time an exception is raised from a route block or a filter
+  error 500 do
+    content_type :json
+    status 500 # a generic server error
+    # maybe we should detail it in some way
+
+    e = env['sinatra.error']
+    e.to_json
+  end
+  # Method Not Allowed:
+  # the path exist but no HTTP verb was defined for it
+  error 405 do
+    status 405, 'the path exist but no HTTP verb was defined for it'
+  end
+  # generic error: all others
+  error do
+    status 500, "Wow, some generic Error was popping up: " + params['captures'].first.inspect
   end
 
 
@@ -565,6 +604,7 @@ class PassServer < Sinatra::Base
     end
   end
 
+  # Get User by Pass
   # Retrieve the owner of the specified pass
   # Used by the iOS app to match a pass's barcode to a user account
   get "/user_for_pass/:pass_type_id/:serial_number/:authentication_token" do
@@ -583,42 +623,92 @@ class PassServer < Sinatra::Base
   # Pass Data (aka pass.json and pass url) API
   # Pass Template API
 
-  # get a list of all passes data
+  # Get a list of all passes data
   # for web UI and development only
   get "/passes" do
+    # let's check validity of provided DevToken in Authorization Header
+    # and halt with 401 if it is wrong
+    check_dev_token? if !request.accept? "*/*"
+
     content_type :json
     get_all_passes_data.to_json
   end
 
-  # get json payload by pass serial No.
-  get "/passes/json/:pass_type_id/:serial_number" do
-    content_type :json
-    get_all_passes_data.to_json
-  end
-
-  # Create new Pass Data Template (pass.json data)
-  # expects json to create a new PassJson object
-  # request should contain valid dev_token for integrator
-  #
-  # POST /passes/json/<pass_type_id>
+  # Get pass.json payload by pass serial No.
+  # GET /passes/json/<pass_type_id>/<serial_number>
   # Header: Authorization: DevToken <dev_token>
-  # JSON payload: ** see a pass.json sample file **
   # in param:
   # :pass_type_id   - the bundle identifier for a class of passes, sometimes refered to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
   # out param:
   # :serial_number  - the pass serial number
   #
   # server response:
-  # return: { id : new_pass_id, serial : <pass_serial_number>, url : <pass_access_url> }
+  # return: [passType: 'pass/template', passData: { <pass.json> data }]
+  # --> if auth token is correct: 200, with <pass.json> data
+  # --> if unsupported HTTP_ACCEPT Header provided: 400
+  # --> if dev_token is incorrect: 401
+  # --> if can't get pass.json data by this serial: 422 (Unprocessable Entity)
+  get "/passes/json/:pass_type_id/:serial_number" do
+    if !request.accept? "application/json"
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only application/json supported"
+      halt 400, "Bad HTTP_ACCEPT Header. Only application/json supported"
+    end
+
+    # let's check validity of provided DevToken in Authorization Header
+    # and halt with 401 if it is wrong
+    check_dev_token?
+
+    # check for valid pass_type_id
+    # passes in passes_json and passes tables should match!
+    begin
+      pass_serial = self.passes.where(:pass_type_id => params[:pass_type_id], :serial_number => params[:serial_number]).select(:serial_number).first
+    rescue Sequel::Error => e
+      halt 500, e.message
+    else
+      pass_json = PassJson.first(:serial => params[:serial_number])
+      content_type :json
+
+      # Pass
+      if pass_serial && pass_json && pass_json["serial"] == pass_serial[:serial_number]
+        # pass.json exist and there is a serial in passes table
+        halt 200, "[passType: 'pass', passData: #{pass_json[:json_data]}]"
+      elsif pass_json # Template
+        # there is NO pass in passes table with that serial,
+        # let's take it from PassJson - it is a template
+        halt 200, "[passType: 'template', passData: #{pass_json[:json_data]}]"
+      else # 422 Unprocessable Entity
+        halt 422, "there is no pass.json with [#{params[:serial_number]}] serial"
+      end
+    end
+  end
+
+  # Create new Pass Data Template (pass.json data)
+  # expects json to create a new PassJson object
+  # request should contain valid dev_token for integrator
+  #
+  # POST /passes/json/<pass_type_id>/<pass_type>
+  # Header: Authorization: DevToken <dev_token>
+  # JSON payload: ** see a pass.json sample file **
+  # in param:
+  # :pass_type_id   - the bundle identifier for a class of passes, sometimes refered to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
+  # :pass_type - type of received data: 'pass' or 'template'
+  # * 'pass' type triggers pass signing, packing, saving to DB for access via API and triggers APNS update
+  # out param:
+  # :serial_number  - the pass serial number
+  #
+  # server response:
+  # return: { id : new_pass_id, type: '<pass_or_template>', serial : <pass_serial_number>, url : <pass_access_url> }
   # --> if auth token is correct: 200, with pass id, serial no. and pass url
   # --> if unsupported HTTP_ACCEPT Header provided: 400
-  # --> if json was malformated: 415
+  # --> if json or other data was malformated: 415
   # --> if dev_token is incorrect: 401
   # --> if DB insertion error: 500
-  post "/passes/json/:pass_type_id" do
+  post "/passes/json/:pass_type_id/:pass_type" do
     #
-    # !!! check DevToken !!!
+    # !!! no need in DevToken for web/dev mode !!!
     #
+    halt 415, 'wrong pass type' unless params[:pass_type].in? ['pass', 'template']
+
     if request.accept? "text/html"
       # this thread is for html-form post update <edit.html.erb>:
       # <form action="/passes/<%= pass[:id] %>" method="post">
@@ -628,6 +718,10 @@ class PassServer < Sinatra::Base
         redirect "/passes"
       end
     elsif request.accept? "application/json"
+      # let's check validity of provided DevToken in Authorization Header
+      # and halt with 401 if it is wrong
+      check_dev_token?
+
       # expect: {json} in pass.json format
       # return: { :id => new_pass_id, :serial => p[:serial], :url => p[:url], :created_at => p[:created_at], :updated_at => p[:updated_at] }
       # check pass.json object (inbound json paylod)
@@ -639,9 +733,9 @@ class PassServer < Sinatra::Base
           # DEV MODE !!!
           # change to JSON.parse(request.body.read)
           # ******
-          #test_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/1/pass.json"
-          #pass_json = JSON.parse(File.read(test_pass))
-          pass_json = JSON.parse(request.body.read)
+          test_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/1/pass.json"
+          pass_json = JSON.parse(File.read(test_pass))
+          #pass_json = JSON.parse(request.body.read)
 
           # 415 Unsupported Media Type
           # OR 422 Unprocessable Entity
@@ -678,12 +772,21 @@ class PassServer < Sinatra::Base
             :created_at => Time.now,
             :updated_at => Time.now
           )
+          # adding the same data to passes table
+          # user_id == nil means a pass was created via APIs, not weird web-interface
+          # that is because :user_id column is a foreign key !!! in passes table
+          # thus we set it to NULL
+          @new_pass_id = add_pass(@new_serial, new_authentication_token, params[:pass_type_id], nil, params[:pass_type])
           ###
           # sign a new pass !!!!!!!!!!!!!!!
           # and store it in GetPasses DB
+          # for 'pass' type only
           ###
-          # return: { :id => new_pass_id, :serial => p[:serial], :url => p[:url], :created_at => p[:created_at], :updated_at => p[:updated_at] }
-          json_response = "{id: #{@pass_json[:id]}, serial: '#{@new_serial}', url: '#{@pass_json[:url]}', created_at: #{@pass_json[:created_at]}, updated_at: #{@pass_json[:updated_at]}}"
+          # save as a Pass =>> returns new_pass_id
+          # save as a Template =>> new pass_json_id
+          # return: { :id => new_pass_id, type: 'params[:pass_type]', :serial => p[:serial], :url => p[:url], :created_at => p[:created_at], :updated_at => p[:updated_at] }
+          @pass_id = params[:pass_type] == 'pass' ? @new_pass_id : @pass_json[:id]
+          json_response = "{id: #{@pass_id}, type: '#{params[:pass_type]}', serial: '#{@new_serial}', url: '#{@pass_json[:url]}', created_at: #{@pass_json[:created_at]}, updated_at: #{@pass_json[:updated_at]}}"
         end
       end
 
@@ -703,6 +806,150 @@ class PassServer < Sinatra::Base
   end
 
 
+  # Update Pass Data Template (pass.json data)
+  # expects json to update a PassJson object
+  # request should contain valid dev_token for integrator
+  #
+  # PUT /passes/json/<pass_serial>
+  # Header: Authorization: DevToken <dev_token>
+  # JSON payload: ** see a pass.json sample file **
+  # in param:
+  # <pass_serial> - the pass serial number
+  #
+  # server response:
+  # return: { id : new_pass_id, type: '<pass_or_template>', serial : <pass_serial_number>, url : <pass_access_url> }
+  # --> if auth token is correct: 200, with updated pass id
+  # --> if unsupported HTTP_ACCEPT Header provided: 400
+  # --> if json or other data was malformated: 415
+  # --> if dev_token is incorrect: 401
+  # --> if pass_serial is wrong: 404
+  # --> if DB insertion error: 500
+  put "/passes/json/:pass_serial" do
+    if request.accept? "text/html"
+      # this thread is for html-form post update <edit.html.erb>:
+      # <form action="/passes/<%= pass[:id] %>" method="post">
+      if params && params[:pass]
+        #byebug
+        #add_pass_template_with_params(params[:pass])
+        redirect "/"
+      end
+    elsif request.accept? "application/json"
+      # let's check validity of provided DevToken in Authorization Header
+      # and halt with 401 if it is wrong
+      check_dev_token?
+
+      # do we have a pass with that serial?
+      halt 404, 'this pass serial was not found' unless params[:pass_serial] && PassJson.first(:serial => params[:pass_serial])
+
+      # expect: {json} in pass.json format
+      # check pass.json object (inbound json paylod)
+      halt 400, 'empty body' unless request && request.body
+        request.body.rewind
+        begin
+          ########
+          # ******
+          # DEV MODE !!!
+          # change to JSON.parse(request.body.read)
+          # ******
+          #test_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/1/pass.json"
+          #pass_json = JSON.parse(File.read(test_pass))
+          pass_json = JSON.parse(request.body.read)
+
+          # 415 Unsupported Media Type
+          # OR 422 Unprocessable Entity
+          # in case of wrong JSON format - exception raised
+
+          # loading pass.json schema to validate against
+          pass_schema_path = File.dirname(File.expand_path(__FILE__)) + "/data/pass_schema.json"
+          pass_schema = JSON.parse(File.read(pass_schema_path))
+        rescue
+          halt 415, 'json payload parsing and validating error'
+        end
+
+        # here we validate json data against pass_schema.json
+        begin
+          JSON::Validator.validate!(pass_schema, pass_json)
+        rescue JSON::Schema::ValidationError
+          halt 415, $!.message
+        end
+
+        # here we check/select pass type - 'storeCard'
+        # !!! aslo should check: locations, relevantDate, and other params !!!
+        #if pass_json['storeCard'] && params[:pass_type_id]
+          # pass data is correct
+          # and we finally could update the pass to passes_json resource table
+          ########
+          # ******
+          # ADD SSL = httpS:// !!!
+          # ******
+          pass_json_obj = PassJson.first(:serial => params[:pass_serial])
+          update_result = pass_json_obj.update(
+            :json_data  => pass_json,
+            :updated_at => Time.now
+          )
+        #end
+
+
+      if update_result
+        puts "[ ok ] pass data was updated successfully for pass serial: [#{params[:pass_serial]}]"
+        content_type 'application/json', :charset => 'utf-8'
+        halt 200, "[ ok ] pass data was updated successfully for pass serial: [#{params[:pass_serial]}]"
+      else
+        puts "[ fail ] pass data was not updated because of DB Error"
+        content_type 'application/json', :charset => 'utf-8'
+        halt 500, 'DB Error'
+      end
+    else
+      puts "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only application/json supported"
+      status 400
+    end
+  end
+
+
+  # Delete a Pass or Json Data Template
+  #
+  # DELETE /passes/<pass_serial>/<pass_type>
+  # Header: Authorization: DevToken <dev_token>
+  # in param:
+  # <pass_serial> - the pass serial number
+  # <pass_type> - the pass type: 'pass' or 'template'
+
+  #
+  # server response:
+  # --> if sucessfully deleted: 200
+  # --> if unsupported HTTP_ACCEPT Header provided: 400
+  # --> if pass_serial is wrong: 404
+  # --> if pass_type is wrong: 415
+  # --> if dev_token is incorrect: 401
+  # --> if DB deletion error: 500
+  delete "/passes/:pass_serial/:pass_type" do
+    halt 400, "[ fail ] Bad Request. Unsupported HTTP_ACCEPT Header. Only application/json supported" unless request.accept? "application/json"
+    halt 415, '[ fail ] wrong pass type' unless params[:pass_type].in? ['pass', 'template']
+    # let's check validity of provided DevToken in Authorization Header
+    # and halt with 401 if it is wrong
+    check_dev_token?
+
+    begin
+    pass = self.passes.where(:serial_number => params[:pass_serial], :pass_type => params[:pass_type]).first
+    # do we have a pass with that serial?
+    halt 404, 'there is no pass with that serial and type' unless params[:pass_serial] &&
+          params[:pass_serial] && pass
+
+    #byebug
+    self.passes.where(:id => pass[:id]).delete
+    PassJson.first(:serial => params[:pass_serial]).destroy
+
+      puts "[ ok ] pass data was updated successfully for pass serial: [#{params[:pass_serial]}]"
+      content_type 'application/json', :charset => 'utf-8'
+      halt 200, "[ ok ] pass data was updated successfully for pass serial: [#{params[:pass_serial]}]"
+    rescue
+      puts "[ fail ] pass data was not updated because of DB Error"
+      content_type 'application/json', :charset => 'utf-8'
+      halt 500, 'DB Error'
+    end
+  end
+
+
   # End of Pass Data (pass.json data_mapper)
   ####################################
 
@@ -715,6 +962,7 @@ class PassServer < Sinatra::Base
   def get_all_passes_data
     PassJson.all(:order => :id)
   end
+
   #
   ########################
 
@@ -777,12 +1025,12 @@ class PassServer < Sinatra::Base
   def add_pass_for_user(user_id)
     serial_number = new_serial_number
     auth_token = new_authentication_token
-    add_pass(serial_number, auth_token, settings.pass_type_identifier, user_id)
+    add_pass(serial_number, auth_token, settings.pass_type_identifier, user_id, 'pass')
   end
 
-  def add_pass(serial_number, authentication_token, pass_type_id, user_id)
+  def add_pass(serial_number, authentication_token, pass_type_id, user_id, pass_type)
     now = DateTime.now
-    self.passes.insert(:serial_number => serial_number, :authentication_token => authentication_token, :pass_type_id => pass_type_id, :user_id => user_id, :created_at => now, :updated_at => now)
+    self.passes.insert(:user_id => user_id, :serial_number => serial_number, :authentication_token => authentication_token, :pass_type_id => pass_type_id, :pass_type => pass_type, :created_at => now, :updated_at => now)
   end
 
   def add_device_registration(device_id, push_token, pass_type_identifier, serial_number)
@@ -813,6 +1061,16 @@ class PassServer < Sinatra::Base
       return true
     else
       halt 401, 'api_token is incorrect'
+    end
+  end
+
+  # Check validity of DevToken in Authorization Header
+  def check_dev_token?
+    dev_token = self.users.where(:api_token => authentication_token).select(:api_token).first
+    if dev_token
+      return true
+    else
+      halt 401, 'DevToken is incorrect'
     end
   end
 
@@ -903,6 +1161,9 @@ class PassServer < Sinatra::Base
     #********************************************************
 
     # Write out the updated JSON
+    ############################
+    # => to DB
+    # **************************
     File.open(json_file_path, "w") do |f|
       f.write JSON.pretty_generate(pass_json)
     end
@@ -919,14 +1180,22 @@ class PassServer < Sinatra::Base
     end
 
     # Generate and sign the new pass
+    ############################
+    # => to DB
+    # **************************
     pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
     pass_signer.sign_pass!
 
     #byebug
     # NOT sending BUT storing in DB
+    ############################
+    # => to DB
+    # **************************
     # Send the pass file
     puts '[ ok ] Sending pass file.'
     send_file(pass_output_path, :type => :pkpass)
+    # !!!
+    # push_update_for_pass
   end
 
   def push_update_for_pass(pass_id)
