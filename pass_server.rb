@@ -18,6 +18,7 @@ require "data_mapper"
 require_relative "lib/passes_json"
 require "dm-serializer"
 require 'json-schema'
+require 'rake'
 
 # helper for compare single var against multiple values
 class Object
@@ -280,28 +281,17 @@ class PassServer < Sinatra::Base
   # check for the If-Modified-Since header and return HTTP status code 304 if the pass has not changed.
   get '/v1/passes/:pass_type_id/:serial_number' do
     puts "#<PassDeliveryRequest pass_type_id: #{params[:pass_type_id]}, serial_number: #{params[:serial_number]}, authentication_token: #{authentication_token}>"
-    if is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
+    # here we get pass object (i.e. table row) is serial+pass_type+applepass_token matches in some valid Pass:
+    pass = is_auth_token_valid?(params[:serial_number], params[:pass_type_id], authentication_token)
+    if pass
       puts '[ ok ] Pass and authentication token match.'
-
       # If-Modified-Since header checked
       # Load pass data from database
-      begin
-        pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier).first || raise(Sinatra::NotFound)
-      rescue
-        halt 500, 'DB access error'
-      end
       last_modified pass[:updated_at] # this helper will send 304 if pass not changed
 
-      # check pass in passes db
-      # and redirect if exist
-
-
-      # generate and deliver pass if it is a new one
-      # not in passes db
-      deliver_pass(params[:serial_number], params[:pass_type_id])
-    else
-      puts '[ fail ] Not authorized.'
-      status 401
+      # GET-path for pass
+      # http://#{settings.hostname}:#{settings.port}/v1/passes/#{params[:pass_type_id]}/#{params[:serial_number]}
+      deliver_pass(pass, false) # is user attached?
     end
   end
 
@@ -356,7 +346,6 @@ class PassServer < Sinatra::Base
   # !!! CHECK FOR DEVELOPER API OAuth2 token !!!
   get "/users" do
     ordered_users = self.users.order(:name).all
-    #byebug
     if request.accept? "text/html"
       erb :'users/index.html', :locals => { :users => ordered_users }
     elsif request.accept? "application/json"
@@ -594,7 +583,6 @@ class PassServer < Sinatra::Base
   # --> if DB access error: 500
   #
   get "/users/:user_id/pass.pkpass" do
-    #byebug
     begin
       deliver_pass_for_user(params[:user_id])
     rescue
@@ -733,9 +721,9 @@ class PassServer < Sinatra::Base
           # DEV MODE !!!
           # change to JSON.parse(request.body.read)
           # ******
-          test_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/1/pass.json"
-          pass_json = JSON.parse(File.read(test_pass))
-          #pass_json = JSON.parse(request.body.read)
+          #template_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/template/pass.json"
+          #pass_json = JSON.parse(File.read(template_pass))
+          pass_json = JSON.parse(request.body.read)
 
           # 415 Unsupported Media Type
           # OR 422 Unprocessable Entity
@@ -768,7 +756,7 @@ class PassServer < Sinatra::Base
           @pass_json = PassJson.create(
             :serial      => @new_serial,
             :url       => "http://#{settings.hostname}:#{settings.port}/v1/passes/#{params[:pass_type_id]}/#{@new_serial}",
-            :json_data  => pass_json,
+            :json_data  => pass_json.to_json,
             :created_at => Time.now,
             :updated_at => Time.now
           )
@@ -776,16 +764,26 @@ class PassServer < Sinatra::Base
           # user_id == nil means a pass was created via APIs, not weird web-interface
           # that is because :user_id column is a foreign key !!! in passes table
           # thus we set it to NULL
-          @new_pass_id = add_pass(@new_serial, new_authentication_token, params[:pass_type_id], nil, params[:pass_type])
-          ###
-          # sign a new pass !!!!!!!!!!!!!!!
-          # and store it in GetPasses DB
-          # for 'pass' type only
-          ###
+          @new_authentication_token = new_authentication_token
+          @new_pass_id = add_pass(@new_serial, @new_authentication_token, params[:pass_type_id], nil, params[:pass_type])
+
           # save as a Pass =>> returns new_pass_id
           # save as a Template =>> new pass_json_id
           # return: { :id => new_pass_id, type: 'params[:pass_type]', :serial => p[:serial], :url => p[:url], :created_at => p[:created_at], :updated_at => p[:updated_at] }
           @pass_id = params[:pass_type] == 'pass' ? @new_pass_id : @pass_json[:id]
+
+          ###
+          # sign and generate a new pass package
+          # and store it by GET-url in DB
+          # for 'pass' type only
+          ###
+          # "http://#{settings.hostname}:#{settings.port}/v1/passes/#{params[:pass_type_id]}/#{@new_serial}"
+          # GET by: @pass_json[:url]
+          if params[:pass_type] == 'pass'
+            new_pass_path = create_pkpass(@new_serial, params[:pass_type_id], @new_authentication_token)
+            # pushes should be sent only for registered devices - thus only in Update Pass
+          end
+
           json_response = "{id: #{@pass_id}, type: '#{params[:pass_type]}', serial: '#{@new_serial}', url: '#{@pass_json[:url]}', created_at: #{@pass_json[:created_at]}, updated_at: #{@pass_json[:updated_at]}}"
         end
       end
@@ -888,7 +886,20 @@ class PassServer < Sinatra::Base
             :updated_at => Time.now
           )
         #end
-
+        ###
+        # sign and generate a new pass package
+        # and store it by GET-url in DB
+        # for 'pass' type only
+        ###
+        # if there is a Pass in pass table
+        # it means it is a 'pass'-type => re-pack and send a push update
+        pass = self.passes.where(:serial_number => params[:pass_serial]).first || halt(404) #, 'cannot find pass with specified serial'
+        if pass
+          new_pass_path = create_pkpass(params[:pass_serial], pass[:pass_type_id], pass[:authentication_token])
+          push_update_for_pass(@new_pass_id) if new_pass_path # was created sucessfully
+          # pushes should be sent only for registered devices - thus only in Update Pass
+          # and only if there is a registered device for that pass serial
+        end
 
       if update_result
         puts "[ ok ] pass data was updated successfully for pass serial: [#{params[:pass_serial]}]"
@@ -935,7 +946,6 @@ class PassServer < Sinatra::Base
     halt 404, 'there is no pass with that serial and type' unless params[:pass_serial] &&
           params[:pass_serial] && pass
 
-    #byebug
     self.passes.where(:id => pass[:id]).delete
     PassJson.first(:serial => params[:pass_serial]).destroy
 
@@ -975,14 +985,17 @@ class PassServer < Sinatra::Base
     now = DateTime.now
     p[:created_at] = now
     p[:updated_at] = now
+    ##
     # FOR DEVELOPMENT ONLY
+    ##
+    # device_id = user's device
+    # should be updated later
+    # !!!
     p[:device_id] = 'nil';
-    #byebug
     p[:api_token] = new_authentication_token
-    #byebug
     new_user_id = self.users.insert(p)
-
     # Also create a pass for the new user
+    # for testing/dev only
     add_pass_for_user(new_user_id)
 
     return { :id => new_user_id, :api_token => p[:api_token] }
@@ -1046,11 +1059,16 @@ class PassServer < Sinatra::Base
 
   # Validate that the request is authorized to deal with the pass referenced
   def is_auth_token_valid?(serial_number, pass_type_identifier, auth_token)
-    pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier, :authentication_token => auth_token).first
+    begin
+      pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier, :authentication_token => auth_token).first || raise(Sinatra::NotFound)
+    rescue => e
+      halt 500, 'DB access error'
+    end
+
     if pass
-      return true
+      return pass
     else
-      return false
+      halt 401, 'ApplePass token for Pass is incorrect'
     end
   end
 
@@ -1113,19 +1131,21 @@ class PassServer < Sinatra::Base
 
   def deliver_pass_for_user(user_id)
     user = self.users.where(:id => params[:user_id]).first
-    pass = self.passes.where(:user_id => user[:id]).first
-    deliver_pass(pass[:serial_number], pass[:pass_type_id])
+    pass = self.passes.where(:user_id => user[:id]).first || halt(404) # cannot find pass for that user
+    # or
+    # pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier).first || halt(404) #, 'cannot find pass with specified serial and type'
+    # ??
+    deliver_pass(pass) # is user attached?
   end
 
-  def deliver_pass(serial_number, pass_type_identifier)
-    # Load pass data from database
-    # !!! add DB connection error !!!
-    pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier).first || raise(Sinatra::NotFound)
-    # !!! rescue for that raise !!!
-
+  # this one is an old routine
+  # for giving away a pass by web/admin link (in user's profile)
+  def deliver_pass(pass, is_user_attached=true)
     pass_id = pass[:id]
-    user_id = pass[:user_id]
-    user = self.users.where(:id => user_id).first || raise(Sinatra::NotFound)
+    user_id = pass[:user_id] if is_user_attached
+    if is_user_attached && user_id
+      user = self.users.where(:id => user_id).first || halt(404) #, 'cannot find user with specified identifier'
+    end
 
     # Configure folder paths
     passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/data/passes"
@@ -1142,6 +1162,7 @@ class PassServer < Sinatra::Base
     puts "[ ok ] Creating pass data from template."
     FileUtils.cp_r template_folder_path + "/.", target_folder_path
 
+
     ######################
     # here should be 'get json pass template/payload from DB'
     ######################
@@ -1156,8 +1177,13 @@ class PassServer < Sinatra::Base
     pass_json["authenticationToken"] = pass[:authentication_token]
     pass_json["webServiceURL"] = "http://#{settings.hostname}:#{settings.port}/"
     pass_json["barcode"]["message"] = barcode_string_for_pass(pass)
-    pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
-    pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
+    if user
+      pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
+      pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
+    else
+      pass_json["storeCard"]["primaryFields"][0]["value"] = 1000000 # just a demo value
+      pass_json["storeCard"]["secondaryFields"][0]["value"] = "John Doe" # a demo value
+    end
     #********************************************************
 
     # Write out the updated JSON
@@ -1185,25 +1211,123 @@ class PassServer < Sinatra::Base
     # **************************
     pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
     pass_signer.sign_pass!
-
-    #byebug
-    # NOT sending BUT storing in DB
-    ############################
-    # => to DB
     # **************************
     # Send the pass file
     puts '[ ok ] Sending pass file.'
     send_file(pass_output_path, :type => :pkpass)
+  end
+
+  # create and sign a new pkpass package
+  def create_pkpass(serial_number, pass_type_identifier, pass_auth_token)
+    # Load pass data from database
+    # !!! add DB connection error !!!
+    pass = self.passes.where(:serial_number => serial_number, :pass_type_id => pass_type_identifier).first || halt(404) #, 'cannot find pass with specified serial and type'
+
+    # this id is from passes db !!!
+    # NOT from passes_json
+    pass_id = pass[:id]
+    # no need in User Balance - it is a generic pass
+    #user_id = pass[:user_id]
+    #user = self.users.where(:id => user_id).first || halt(404) #, 'cannot find user with specified identifier'
+
+    # Configure folder paths
+    passes_folder_path = File.dirname(File.expand_path(__FILE__)) + "/data/passes"
+    template_folder_path = passes_folder_path + "/template"
+    target_folder_path = passes_folder_path + "/#{pass_id}"
+
+    # Delete pass folder if it already exists
+    # we're storig BLOBs/files on disk for speed concern (not in sqlite)
+    if (File.exists?(target_folder_path))
+      puts "[ ok ] Deleting existing pass data."
+      FileUtils.remove_dir(target_folder_path)
+    else
+      FileUtils.mkdir_p(target_folder_path)
+    end
+
+    # Copy pass files from template folder
+    # except pass.json
+    puts "[ ok ] Creating pass data from template."
+    # copy all pkpass resources into new folder for archiving
+    # excluding pass.json - because it is a tempalte file, the real json payload data comes from PassJson
+    list_of_resources = FileList[template_folder_path + "/*"].exclude(/pass.json$/)
+    FileUtils.cp_r(list_of_resources, target_folder_path)
+    #the FileUtils class mimics a bash shell's file utilities, so "mv" is "move" and "cp" is "copy".
+
+
+    ######################
+    # here should be 'get json pass template/payload from DB'
+    ######################
+    #********************************************************
+    # Modify the pass json
+    puts "[ ok ] Updating pass data."
+    json_file_path = target_folder_path + "/pass.json"
+    #pass_json = JSON.parse(File.read(json_file_path))
+    begin #raise $!, "You fool! Look what you have done! #{$!}", $!.backtrace
+      pass_json_string = PassJson.first(:serial => serial_number, :fields => [:json_data])[:json_data] || raise($!, "wrong or empty json_data")
+      pass_json = JSON.parse(pass_json_string) || raise($!, "json parsing error")
+    rescue => e # =StandardError
+      # to allow global 500 error-helper rescue we should re-raise:
+      raise $!, e.message, $!.backtrace
+    end
+
+    ##
+    # this check should be a level higher
+    ##
+    pass_json["passTypeIdentifier"] = settings.pass_type_identifier if pass_json["passTypeIdentifier"] == "---"
+    pass_json["teamIdentifier"] = settings.team_identifier if pass_json["teamIdentifier"] == "---"
+    # this one already should be the same as pass[:serial_number]
+    # because create_pkpass creating new pass (in json and pass tables)
+    pass_json["serialNumber"] = serial_number
+    pass_json["authenticationToken"] = pass_auth_token
+    pass_json["webServiceURL"] = "http://#{settings.hostname}:#{settings.port}/" if pass_json["webServiceURL"] == "---"
+
+    ##
+    # here should be some Hashie for Redeem State
+    ##
+    # this fields are specific
+    # they should be updated in separate biz routine - Redeem State + Biz Rules Editor
     # !!!
-    # push_update_for_pass
+    pass_json["barcode"]["message"] = barcode_string_for_pass(pass_json)
+    #pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
+    #pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
+    pass_json["storeCard"]["primaryFields"][0]["value"] = 1000000
+    pass_json["storeCard"]["secondaryFields"][0]["value"] = 'Test User'
+    #********************************************************
+
+    # Write out the updated JSON
+    ############################
+    # => to DB (NOT a good idea for SQLite...)
+    # **************************
+    File.open(json_file_path, "w") do |f|
+      f.write JSON.pretty_generate(pass_json)
+    end
+
+    # Prepare for pass signing
+    pass_folder_path = target_folder_path
+    pass_signing_certificate_path = get_certificate_path
+    wwdr_certificate_path = get_wwdr_certificate_path
+    pass_output_path = passes_folder_path + "/#{pass_id}.pkpass"
+
+    # Remove the old pass if it exists
+    if File.exists?(pass_output_path)
+      File.delete(pass_output_path)
+    end
+
+    # Generate and sign the new pass
+    ############################
+    # => to DB (NOT a good idea for SQLite...)
+    # **************************
+    pass_signer = SignPass.new(pass_folder_path, pass_signing_certificate_path, settings.certificate_password, wwdr_certificate_path, pass_output_path)
+    pass_signer.sign_pass!
+
+    # a full path to created pkpass
+    pass_output_path
   end
 
   def push_update_for_pass(pass_id)
     APNS.certificate_password = settings.certificate_password
-    #byebug
     APNS.instance.open_connection("production")
     puts "Opening connection to APNS."
-    #byebug
     # Get the list of registered devices and send a push notification
     pass = self.passes.where(:id => pass_id).first
     push_tokens = self.registrations.where(:serial_number => pass[:serial_number]).collect{|r| r[:push_token]}.uniq
@@ -1221,6 +1345,15 @@ class PassServer < Sinatra::Base
       "pass_type_id" => pass[:pass_type_id],
       "serial_number" => pass[:serial_number],
       "authentication_token" => pass[:authentication_token]
+    }
+    barcode_string.to_json
+  end
+
+  def barcode_string_for_json(json)
+    barcode_string = {
+      "pass_type_id" => json[:pass_type_id],
+      "serial_number" => json[:serial_number],
+      "authentication_token" => json[:authentication_token]
     }
     barcode_string.to_json
   end
@@ -1294,7 +1427,7 @@ class PassServer < Sinatra::Base
       # update user with newly generated device_id
       user = self.users.where(:user_id => user_id)
       user.update(:device_id => device_id)
-    rescue Exception
+    rescue => e # =StandardError
       # we just ingest all errors
       puts "Exception in add_device_id_for_user #{$!}"
       err = true

@@ -93,7 +93,7 @@ class SignPass
     self.compress_pass_file
 
     # Clean up the temp directory
-    #self.delete_temp_dir
+    self.delete_temp_dir
   end
 
 
