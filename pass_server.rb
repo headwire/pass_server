@@ -696,7 +696,7 @@ class PassServer < Sinatra::Base
     # !!! no need in DevToken for web/dev mode !!!
     #
     halt 415, 'wrong pass type' unless params[:pass_type].in? ['pass', 'template']
-    byebug
+
     if request.accept? "text/html"
       # this thread is for html-form post update <edit.html.erb>:
       # <form action="/passes/<%= pass[:id] %>" method="post">
