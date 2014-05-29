@@ -267,7 +267,8 @@ class PassServer < Sinatra::Base
 
 
   # Pass delivery
-  # (Getting the Latest Version of a Pass)
+  # (Getting the Latest Version of a Pass - for Passbook)
+  # after device registers and Passbook could get Device Authentication Token (stored in pass.json)
   #
   # GET /v1/passes/<typeID>/<serial#>
   # Header: Authorization: ApplePass <authenticationToken>
@@ -295,6 +296,35 @@ class PassServer < Sinatra::Base
     end
   end
 
+  ##
+  # GET pkpass file to access via web/email URL
+  # no ApplePass (= authentication token stored in pass.json)
+  ##
+  # GET /passes/<pass_type_id>/<serial_number>
+  # in param:
+  # :pass_type_id   - the bundle identifier for a class of passes registered with WWDR
+  # :serial_number  - the pass serial number
+  #
+  # server response:
+  # pkpass file with MIME type: 'application/vnd.apple.pkpass'
+  get "/passes/:pass_type_id/:serial_number" do
+    # check for valid pass_type_id and serial
+    begin
+      pass = self.passes.where(:pass_type_id => params[:pass_type_id], :serial_number => params[:serial_number]).first
+    rescue => e
+      halt 500, e.message
+    else
+      pass_json = PassJson.first(:serial => params[:serial_number])
+      content_type :json
+      # Pass
+      if pass && pass_json
+        # pass.json exist and there is a serial in passes table
+        halt 200, deliver_pass(pass, false) # false - means there is NO attached User to Pass (not from UI)
+      else # 422 Unprocessable Entity
+        halt 422, "there is no pass.json with [#{params[:serial_number]}] serial"
+      end
+    end
+  end
 
   # Logging/Debugging from the device
   #
@@ -378,6 +408,7 @@ class PassServer < Sinatra::Base
   post "/users" do
     #
     # !!! check DevToken !!!
+    # !!! separate field in web form !!!
     #
     if request.accept? "text/html"
       # this thread is for html-form post update <edit.html.erb>:
@@ -626,9 +657,10 @@ class PassServer < Sinatra::Base
   # GET /passes/json/<pass_type_id>/<serial_number>
   # Header: Authorization: DevToken <dev_token>
   # in param:
-  # :pass_type_id   - the bundle identifier for a class of passes, sometimes refered to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
-  # out param:
+  # :pass_type_id   - the bundle identifier for a class of passes registered with WWDR
   # :serial_number  - the pass serial number
+  # out param:
+  # json: {passType + PassJson[:json_data]}
   #
   # server response:
   # return: [passType: 'pass/template', passData: { <pass.json> data }]
@@ -650,7 +682,7 @@ class PassServer < Sinatra::Base
     # passes in passes_json and passes tables should match!
     begin
       pass_serial = self.passes.where(:pass_type_id => params[:pass_type_id], :serial_number => params[:serial_number]).select(:serial_number).first
-    rescue Sequel::Error => e
+    rescue => e
       halt 500, e.message
     else
       pass_json = PassJson.first(:serial => params[:serial_number])
@@ -678,7 +710,7 @@ class PassServer < Sinatra::Base
   # Header: Authorization: DevToken <dev_token>
   # JSON payload: ** see a pass.json sample file **
   # in param:
-  # :pass_type_id   - the bundle identifier for a class of passes, sometimes refered to as the pass topic, e.g. pass.com.apple.backtoschoolgift, registered with WWDR
+  # :pass_type_id   - the bundle identifier for a class of passes registered with WWDR
   # :pass_type - type of received data: 'pass' or 'template'
   # * 'pass' type triggers pass signing, packing, saving to DB for access via API and triggers APNS update
   # out param:
@@ -755,7 +787,7 @@ class PassServer < Sinatra::Base
           # ******
           @pass_json = PassJson.create(
             :serial      => @new_serial,
-            :url       => "http://#{settings.hostname}:#{settings.port}/v1/passes/#{params[:pass_type_id]}/#{@new_serial}",
+            :url       => "http://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{@new_serial}",
             :json_data  => pass_json.to_json,
             :created_at => Time.now,
             :updated_at => Time.now
@@ -777,7 +809,7 @@ class PassServer < Sinatra::Base
           # and store it by GET-url in DB
           # for 'pass' type only
           ###
-          # "http://#{settings.hostname}:#{settings.port}/v1/passes/#{params[:pass_type_id]}/#{@new_serial}"
+          # "http://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{@new_serial}"
           # GET by: @pass_json[:url]
           if params[:pass_type] == 'pass'
             new_pass_path = create_pkpass(@new_serial, params[:pass_type_id], @new_authentication_token)
@@ -1044,6 +1076,37 @@ class PassServer < Sinatra::Base
   def add_pass(serial_number, authentication_token, pass_type_id, user_id, pass_type)
     now = DateTime.now
     self.passes.insert(:user_id => user_id, :serial_number => serial_number, :authentication_token => authentication_token, :pass_type_id => pass_type_id, :pass_type => pass_type, :created_at => now, :updated_at => now)
+    ##
+    # adding actual json.data (from template) to PassJson
+    ##
+    begin
+      template_pass = File.dirname(File.expand_path(__FILE__)) + "/data/passes/template/pass.json"
+      pass_json = JSON.parse(File.read(template_pass))
+
+      # loading pass.json schema to validate against
+      pass_schema_path = File.dirname(File.expand_path(__FILE__)) + "/data/pass_schema.json"
+      pass_schema = JSON.parse(File.read(pass_schema_path))
+    rescue
+          halt 415, 'cannot add_pass with malformed json'
+    end
+    ## here we validate json data against pass_schema.json
+    begin
+      JSON::Validator.validate!(pass_schema, pass_json)
+
+      # ******
+      # ADD SSL = httpS:// !!!
+      # ******
+      # saving a json Template ! not actual pass
+      @pass_json = PassJson.create(
+          :serial      => serial_number,
+          :url       => "http://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{serial_number}",
+          :json_data  => pass_json.to_json,
+          :created_at => now,
+          :updated_at => now
+      )
+    rescue JSON::Schema::ValidationError
+      halt 500, $!.message
+    end
   end
 
   def add_device_registration(device_id, push_token, pass_type_identifier, serial_number)
@@ -1214,7 +1277,7 @@ class PassServer < Sinatra::Base
     # **************************
     # Send the pass file
     puts '[ ok ] Sending pass file.'
-    send_file(pass_output_path, :type => :pkpass)
+    send_file(pass_output_path, :type => :pkpass, :filename => "iVeew.co.pkpass")
   end
 
   # create and sign a new pkpass package
