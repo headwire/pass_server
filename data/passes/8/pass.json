@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "passTypeIdentifier": "pass.iveew",
+  "serialNumber": "330475fa21fae034a9c7c2287be00f77",
+  "teamIdentifier": "TH6A6P7KL8",
+  "webServiceURL": "https://107.170.50.205:8080/",
+  "authenticationToken": "3d5ed8fc5513aaa1619ff5d11e5f3ada",
+  "beacons": [
+    {
+      "proximityUUID": "35bc2d51-577c-4f2e-89bc-33e7530dff83",
+      "relevantText": "hi Alex check app launching"}
+  ],
+  "associatedStoreIdentifiers":[606210918],
+  "organizationName": "SecondConf",
+  "logoText": "SecondConf",
+  "description": "BLE app launch Beacon",
+  "foregroundColor": "rgb(255, 255, 255)",
+  "backgroundColor": "rgb(206, 140, 53)",
+  "coupon": {
+    "primaryFields": [
+      {
+        "key": "offer",
+        "label": "Find the iBeacons",
+        "value": "iBacon"
+      }
+    ],
+    "auxiliaryFields": [
+      {
+        "key": "expires",
+        "label": "EXPIRES",
+        "value": "Today"
+      }
+    ],
+    "backFields": [
+      {
+        "key": "terms",
+        "label": "TERMS AND CONDITIONS",
+        "value": "SecondConf offers this pass, including all information, software, products and services available from this pass or offered as part of or in conjunction with this pass (the \"pass\"), to you, the user, conditioned upon your acceptance of all of the terms, conditions, policies and notices stated here. SecondConf reserves the right to make changes to these Terms and Conditions immediately by posting the changed Terms and Conditions in this location.\n\nUse the pass at your own risk. This pass is provided to you \"as is,\" without warranty of any kind either express or implied. Neither SecondConf nor its employees, agents, third-party information providers, merchants, licensors or the like warrant that the pass or its operation will be accurate, reliable, uninterrupted or error-free. No agent or representative has the authority to create any warranty regarding the pass on behalf of SecondConf. SecondConf reserves the right to change or discontinue at any time any aspect or feature of the pass."
+      }
+    ]
+  }
+}

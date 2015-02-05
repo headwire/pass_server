@@ -1,7 +1,10 @@
 require './pass_server'
+require 'rack/ssl'
 
 # Used to implement HTTP PUT and DELETE with HTTP POST and _method
 use Rack::MethodOverride
+# Force SSL/TLS
+#use Rack::SSL
 
 # Pass Server Settings
 PassServer.set :hostname, "107.170.50.205"

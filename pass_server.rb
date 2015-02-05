@@ -20,6 +20,7 @@ require "dm-serializer"
 require 'json-schema'
 require 'rake'
 
+
 # helper for compare single var against multiple values
 class Object
   def in? container
@@ -375,7 +376,7 @@ class PassServer < Sinatra::Base
   #
   # !!! CHECK FOR DEVELOPER API OAuth2 token !!!
   get "/users" do
-    ordered_users = self.users.order(:name).all
+    ordered_users = self.users.order(:id).all
     if request.accept? "text/html"
       erb :'users/index.html', :locals => { :users => ordered_users }
     elsif request.accept? "application/json"
@@ -777,7 +778,7 @@ class PassServer < Sinatra::Base
 
         # here we check/select pass type - 'storeCard'
         # !!! aslo should check: locations, relevantDate, and other params !!!
-        if pass_json['storeCard'] && params[:pass_type_id]
+        if params[:pass_type_id] ## && pass_json['storeCard']
           # pass type is 'storeCard'
           # and we finally could save the pass to passes_json resource table
           @new_serial = new_serial_number
@@ -787,7 +788,7 @@ class PassServer < Sinatra::Base
           # ******
           @pass_json = PassJson.create(
             :serial      => @new_serial,
-            :url       => "http://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{@new_serial}",
+            :url       => "https://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{@new_serial}",
             :json_data  => pass_json.to_json,
             :created_at => Time.now,
             :updated_at => Time.now
@@ -809,7 +810,7 @@ class PassServer < Sinatra::Base
           # and store it by GET-url in DB
           # for 'pass' type only
           ###
-          # "http://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{@new_serial}"
+          # "https://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{@new_serial}"
           # GET by: @pass_json[:url]
           if params[:pass_type] == 'pass'
             new_pass_path = create_pkpass(@new_serial, params[:pass_type_id], @new_authentication_token)
@@ -905,7 +906,7 @@ class PassServer < Sinatra::Base
 
         # here we check/select pass type - 'storeCard'
         # !!! aslo should check: locations, relevantDate, and other params !!!
-        #if pass_json['storeCard'] && params[:pass_type_id]
+        #if params[:pass_type_id] # && pass_json['storeCard']
           # pass data is correct
           # and we finally could update the pass to passes_json resource table
           ########
@@ -1099,7 +1100,7 @@ class PassServer < Sinatra::Base
       # saving a json Template ! not actual pass
       @pass_json = PassJson.create(
           :serial      => serial_number,
-          :url       => "http://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{serial_number}",
+          :url       => "https://#{settings.hostname}:#{settings.port}/passes/#{params[:pass_type_id]}/#{serial_number}",
           :json_data  => pass_json.to_json,
           :created_at => now,
           :updated_at => now
@@ -1238,15 +1239,15 @@ class PassServer < Sinatra::Base
     pass_json["teamIdentifier"] = settings.team_identifier
     pass_json["serialNumber"] = pass[:serial_number]
     pass_json["authenticationToken"] = pass[:authentication_token]
-    pass_json["webServiceURL"] = "http://#{settings.hostname}:#{settings.port}/"
-    pass_json["barcode"]["message"] = barcode_string_for_pass(pass)
-    if user
-      pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
-      pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
-    else
-      pass_json["storeCard"]["primaryFields"][0]["value"] = 1000000 # just a demo value
-      pass_json["storeCard"]["secondaryFields"][0]["value"] = "John Doe" # a demo value
-    end
+    pass_json["webServiceURL"] = "https://#{settings.hostname}:#{settings.port}/"
+    ###pass_json["barcode"]["message"] = barcode_string_for_pass(pass)
+    #if user
+    #  pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
+    #  pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
+    #else
+    #  pass_json["storeCard"]["primaryFields"][0]["value"] = 1000000 # just a demo value
+    #  pass_json["storeCard"]["secondaryFields"][0]["value"] = "John Doe" # a demo value
+    #end
     #********************************************************
 
     # Write out the updated JSON
@@ -1342,7 +1343,7 @@ class PassServer < Sinatra::Base
     # because create_pkpass creating new pass (in json and pass tables)
     pass_json["serialNumber"] = serial_number
     pass_json["authenticationToken"] = pass_auth_token
-    pass_json["webServiceURL"] = "http://#{settings.hostname}:#{settings.port}/" if pass_json["webServiceURL"] == "---"
+    pass_json["webServiceURL"] = "https://#{settings.hostname}:#{settings.port}/" if pass_json["webServiceURL"] == "---"
 
     ##
     # here should be some Hashie for Redeem State
@@ -1350,11 +1351,11 @@ class PassServer < Sinatra::Base
     # this fields are specific
     # they should be updated in separate biz routine - Redeem State + Biz Rules Editor
     # !!!
-    pass_json["barcode"]["message"] = barcode_string_for_pass(pass_json)
+    ###pass_json["barcode"]["message"] = barcode_string_for_pass(pass_json)
     #pass_json["storeCard"]["primaryFields"][0]["value"] = user[:account_balance]
     #pass_json["storeCard"]["secondaryFields"][0]["value"] = user[:name]
-    pass_json["storeCard"]["primaryFields"][0]["value"] = 1000000
-    pass_json["storeCard"]["secondaryFields"][0]["value"] = 'Test User'
+    ###pass_json["storeCard"]["primaryFields"][0]["value"] = 1000000
+    ###pass_json["storeCard"]["secondaryFields"][0]["value"] = 'Test User'
     #********************************************************
 
     # Write out the updated JSON
